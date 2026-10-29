@@ -10,6 +10,8 @@ import { makeTileAtlas } from '../art/tiles';
 import { makeIconAtlas } from '../art/icons';
 import { ENEMY_CLIPS, NPC_CLIPS, PLAYER_CLIPS } from '../art/anim';
 import { BEASTS, LOOKS } from '../art/looks';
+import { bakeCoded } from '../art/codedbake';
+import { spriteByName } from '../sprites';
 import { bakeBeast } from '../art/bakebeast';
 import { P } from '../art/palette';
 import type { Look } from '../art/look';
@@ -115,7 +117,7 @@ export class GameScene extends Phaser.Scene {
     this.stream.update(this.P.x, this.P.y);
 
     const baked = this.bakePlayer(true);
-    this.player = new Actor(this, { key: PLAYER_KEY, baked, x: this.P.x, y: this.P.y, faction: 'player', hp: maxHp(this.P), name: 'you' });
+    this.player = new Actor(this, { key: baked.key, baked, x: this.P.x, y: this.P.y, faction: 'player', hp: maxHp(this.P), name: 'you' });
     this.player.hp = this.P.hp || maxHp(this.P);
     this.player.maxHp = maxHp(this.P);
     this.player.poise = this.player.poiseCur = 18 + armorTotals(this.P).poise;
@@ -178,7 +180,22 @@ export class GameScene extends Phaser.Scene {
     };
   }
 
+  /**
+   * Which drawn sheet the player should be wearing. Each armour set has its own
+   * ChatGPT-derived sheet; the base `player` sheet is the starting wanderer.
+   */
+  playerSheet() {
+    const set = itemOf(this.P.equip.chest)?.setId;
+    return (set && spriteByName(`player_${set}`)) || spriteByName('player');
+  }
+
   bakePlayer(sync = false): Baked {
+    const sheet = this.playerSheet();
+    if (sheet) {
+      const key = `coded_${sheet.name}`;
+      const got = getBaked(key);
+      return got ?? bakeCoded(this, { key, sprite: sheet });
+    }
     const look = this.playerLook();
     const spec = { key: PLAYER_KEY, look, clips: PLAYER_CLIPS, mirror: false, seed: 11 };
     if (sync) return bakeNow(this, spec);
@@ -187,7 +204,7 @@ export class GameScene extends Phaser.Scene {
   }
   /** Called by the UI after any equipment change. */
   refreshAppearance() {
-    const b = bakeNow(this, { key: PLAYER_KEY, look: this.playerLook(), clips: PLAYER_CLIPS, mirror: false, seed: 11 });
+    const b = this.bakePlayer(true);
     this.player.rebind(b);
     this.player.maxHp = maxHp(this.P);
     this.player.hp = Math.min(this.player.hp, this.player.maxHp);
