@@ -27,6 +27,7 @@ import boss_smith from './boss_smith';
 import player_grave from './player_grave';
 import player_choir from './player_choir';
 import player_hunter from './player_hunter';
+import player_crown from './player_crown';
 // --- generated sprite imports end ---
 
 export const SPRITES: CodedSprite[] = [
@@ -54,6 +55,7 @@ export const SPRITES: CodedSprite[] = [
   player_grave,
   player_choir,
   player_hunter,
+  player_crown,
   // --- generated sprite list end ---
 ];
 
