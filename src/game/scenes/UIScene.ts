@@ -5,13 +5,17 @@ import { bar, button, C, frame, txt } from '../ui/widgets';
 import { resolve } from '../art/bake';
 import { ARMOR_SETS, ITEMS, UPGRADE_COST, upgradeMul, type ItemDef } from '../content/items';
 import { NPCS, REMNANTS, type Remnant } from '../content/lore';
+import { ENEMIES } from '../content/enemies';
 import { CHAPTERS, ENDINGS, currentChapter } from '../content/story';
 import { BIOMES } from '../world/types';
 import {
-  activeSets, addItem, armorTotals, carried, countItem, equip, itemOf, LOAD_NAME, loadTier,
-  maxHp, maxLoad, maxStam, removeItem, slotFor, STAT_BLURB, STAT_NAME, STATS, upgradeOf,
-  weaponPower, xpForLevel,
+  acceptContract, activeSets, addItem, armorTotals, buyFrom, carried, contractProgress, countItem,
+  currentBoard, equip, itemOf, LOAD_NAME, loadTier, maxHp, maxLoad, maxStam, priceToBuy, priceToSell,
+  removeItem, sellable, sellTo, shopState, slotFor, STAT_BLURB, STAT_NAME, STATS, turnInContract,
+  upgradeOf, weaponPower, xpForLevel,
 } from '../state';
+import { SHOPS, type ShopDef } from '../content/shops';
+import { ICON, iconKey } from '../art/icons';
 import { armorReduction } from '../combat';
 import { sfx } from '../sfx';
 import type { GameScene } from './GameScene';
@@ -19,7 +23,10 @@ import type { Actor } from '../actor';
 
 type Panel =
   | null | 'inventory' | 'character' | 'lantern' | 'levelup' | 'travel' | 'smith'
-  | 'shop' | 'dialog' | 'map' | 'journal' | 'pause' | 'help' | 'death' | 'remnant' | 'ending';
+  | 'shop' | 'contracts' | 'dialog' | 'map' | 'journal' | 'pause' | 'help'
+  | 'death' | 'remnant' | 'ending';
+
+const ENEMY_NAME = (id: string) => ENEMIES[id]?.name ?? id;
 
 export class UIScene extends Phaser.Scene {
   g!: GameScene;
@@ -52,8 +59,9 @@ export class UIScene extends Phaser.Scene {
   dialogNpc: Actor | null = null;
   dialogNode = 'start';
   invTab: 'weapon' | 'armour' | 'items' = 'weapon';
-  shopStock: string[] = [];
+  shop: ShopDef | null = null;
   shopMode: 'buy' | 'sell' = 'buy';
+  bulk = 1;
   remnant: Remnant | null = null;
   smithTarget: string | null = null;
   endingId: string | null = null;
@@ -371,6 +379,7 @@ export class UIScene extends Phaser.Scene {
       case 'travel': this.buildTravel(); break;
       case 'smith': this.buildSmith(); break;
       case 'shop': this.buildShop(); break;
+      case 'contracts': this.buildContracts(); break;
       case 'dialog': this.buildDialog(); break;
       case 'map': this.buildMap(); break;
       case 'journal': this.buildJournal(); break;
@@ -431,9 +440,10 @@ export class UIScene extends Phaser.Scene {
       const it = itemOf(P.equip[k]);
       const up = it ? upgradeOf(P, it.id) : 0;
       this.add2(txt(this, dx, y + 2, label, 14, C.dim));
-      const row = this.add2(this.add.rectangle(dx, y + 18, 300, 26, it ? 0x1a1d16 : 0x111320)
+      const row = this.add2(this.add.rectangle(dx, y + 16, 300, 30, it ? 0x1a1d16 : 0x111320)
         .setOrigin(0, 0).setStrokeStyle(1, it ? C.edge : C.edgeDim, it ? 0.7 : 0.4));
-      this.add2(txt(this, dx + 8, y + 21, it ? `${it.name}${up ? ` +${up}` : ''}` : '—', 17, it ? C.text : C.dim, 286));
+      if (it) this.icon(dx + 2, y + 13, it.id, 0.85);
+      this.add2(txt(this, dx + (it ? 40 : 8), y + 21, it ? `${it.name}${up ? ` +${up}` : ''}` : '—', 17, it ? C.text : C.dim, 252));
       if (it) {
         row.setInteractive({ useHandCursor: true });
         row.on('pointerover', () => row.setFillStyle(0x262a1c));
@@ -457,8 +467,9 @@ export class UIScene extends Phaser.Scene {
         .setOrigin(0, 0).setStrokeStyle(1, worn ? C.edge : C.edgeDim, 0.7).setInteractive({ useHandCursor: true }));
       bg.on('pointerdown', () => this.useOrEquip(it));
       bg.on('pointerover', () => { this.showTip(it, lx, y + 44); });
+      this.icon(lx + 3, y + 1, it.id, 0.95);
       const up = upgradeOf(P, it.id);
-      this.add2(txt(this, lx + 10, y + 8, `${it.name}${up ? ` +${up}` : ''}${s.qty > 1 ? `  ×${s.qty}` : ''}`, 19, worn ? C.goldHi : C.text));
+      this.add2(txt(this, lx + 8 + ICON, y + 8, `${it.name}${up ? ` +${up}` : ''}${s.qty > 1 ? `  ×${s.qty}` : ''}`, 19, worn ? C.goldHi : C.text));
       this.add2(txt(this, lx + 460, y + 10, this.statLine(it), 16, C.dim).setOrigin(1, 0));
     });
     this.add2(txt(this, lx, b.y + b.h - 36, 'Click an item to equip or use. Click a worn slot to remove it.', 16, C.dim));
@@ -646,7 +657,8 @@ export class UIScene extends Phaser.Scene {
       const max = it.upgradeMax ?? 10;
       const cost = UPGRADE_COST(lvl);
       const y = b.y + 96 + i * 46;
-      this.add2(txt(this, b.x + 30, y + 6, `${it.name} +${lvl}`, 19, C.text));
+      this.icon(b.x + 28, y + 1, it.id, 0.85);
+      this.add2(txt(this, b.x + 66, y + 6, `${it.name} +${lvl}`, 19, C.text));
       this.add2(txt(this, b.x + 330, y + 8, `ATK ${Math.round((it.dmg ?? 0) * upgradeMul(lvl))}`, 17, C.dim));
       const can = lvl < max && glass >= cost;
       const btn = button(this, b.x + 460, y, 170, 34, lvl >= max ? 'MAX' : `+1  (${cost} glass)`, () => {
@@ -664,40 +676,150 @@ export class UIScene extends Phaser.Scene {
   }
 
   // ----------------------------------------------------------------- shop
+  /** Small icon sprite for an item id. */
+  icon(x: number, y: number, id: string, scale = 1) {
+    const img = this.add.image(x, y, 'icons', iconKey(id)).setOrigin(0, 0).setScale(scale).setScrollFactor(0);
+    return this.add2(img);
+  }
+
   buildShop() {
     const P = this.g.P;
-    const b = this.box(820, 540, this.shopMode === 'buy' ? 'WARES' : 'SELL');
-    this.add2(txt(this, b.x + 30, b.y + 58, `Runes  ${P.runes}`, 20, C.gold));
+    const shop = this.shop;
+    if (!shop) return this.close();
+    const b = this.box(980, 600, shop.title.toUpperCase());
+    shopState(P, shop); // ensure stock exists and restocks are applied
+    this.add2(txt(this, b.x + 30, b.y + 56, shop.blurb, 17, C.dim, b.w - 400));
+    this.add2(txt(this, b.x + b.w - 30, b.y + 52, `RUNES  ${P.runes}`, 21, C.gold).setOrigin(1, 0));
+
+    const likes = Object.entries(shop.pays).filter(([, m]) => (m ?? 1) > 1.05).map(([k]) => k);
+    const hates = shop.refuses ?? [];
+    if (likes.length) this.add2(txt(this, b.x + b.w - 30, b.y + 78, `Pays well for: ${likes.join(', ')}`, 15, C.good).setOrigin(1, 0));
+    if (hates.length) this.add2(txt(this, b.x + b.w - 30, b.y + 97, `Will not take: ${hates.join(', ')}`, 15, C.danger).setOrigin(1, 0));
+
+    const ry = b.y + 124;
     const modes: ('buy' | 'sell')[] = ['buy', 'sell'];
     modes.forEach((m, i) => {
-      const btn = button(this, b.x + b.w - 230 + i * 100, b.y + 54, 92, 30, m.toUpperCase(), () => { this.shopMode = m; this.rebuild(); }, true, 17);
-      if (this.shopMode === m) btn.label.setColor(C.goldHi);
+      const btn = button(this, b.x + 30 + i * 104, ry, 96, 32, m.toUpperCase(), () => { this.shopMode = m; this.rebuild(); }, true, 18);
+      if (this.shopMode === m) { btn.label.setColor(C.goldHi); btn.bg.setFillStyle(0x2a2e3a); }
       this.add2(btn.bg); this.add2(btn.label);
     });
-    const rows = this.shopMode === 'buy'
-      ? this.shopStock.map(id => ({ id, qty: 1 }))
-      : P.inv.filter(s => ITEMS[s.id] && ITEMS[s.id].value > 0 && ITEMS[s.id].kind !== 'key' && !Object.values(P.equip).includes(s.id));
-    if (!rows.length) this.add2(txt(this, b.x + 30, b.y + 110, 'Nothing to trade.', 18, C.dim));
-    rows.slice(0, 9).forEach((s, i) => {
-      const it = ITEMS[s.id];
-      const y = b.y + 100 + i * 44;
-      const price = this.shopMode === 'buy' ? it.value : Math.max(1, Math.round(it.value * 0.4));
-      const can = this.shopMode === 'buy' ? P.runes >= price : true;
-      this.add2(txt(this, b.x + 30, y + 8, `${it.name}${s.qty > 1 ? `  ×${s.qty}` : ''}`, 19, C.text));
-      this.add2(txt(this, b.x + 420, y + 10, this.statLine(it), 16, C.dim));
-      const btn = button(this, b.x + b.w - 190, y, 160, 34, `${this.shopMode === 'buy' ? 'Buy' : 'Sell'}  ${price}`, () => {
-        if (this.shopMode === 'buy') {
-          if (P.runes < price) return;
-          P.runes -= price; addItem(P, it.id, 1);
-          this.log(`Bought ${it.name}.`, C.good);
-        } else {
-          if (!removeItem(P, it.id, 1)) return;
-          P.runes += price;
-          this.log(`Sold ${it.name}.`, C.gold);
-        }
-        sfx.pickup();
+    for (const n of [1, 5, 10]) {
+      const i = [1, 5, 10].indexOf(n);
+      const btn = button(this, b.x + 262 + i * 62, ry, 56, 32, `×${n}`, () => { this.bulk = n; this.rebuild(); }, true, 17);
+      if (this.bulk === n) { btn.label.setColor(C.goldHi); btn.bg.setFillStyle(0x2a2e3a); }
+      this.add2(btn.bg); this.add2(btn.label);
+    }
+
+    if (this.shopMode === 'buy') this.shopBuyList(b, shop);
+    else this.shopSellList(b, shop);
+  }
+
+  shopBuyList(b: { x: number; y: number; w: number; h: number }, shop: ShopDef) {
+    const P = this.g.P;
+    const st = shopState(P, shop);
+    const rows = shop.stock.filter(e => ITEMS[e.id] && ((st.stock[e.id] ?? 0) > 0 || e.restock > 0));
+    if (!rows.length) { this.add2(txt(this, b.x + 30, b.y + 180, 'The shelf is bare.', 19, C.dim)); return; }
+    rows.slice(0, 9).forEach((e, i) => {
+      const it = ITEMS[e.id];
+      const y = b.y + 168 + i * 46;
+      const have = st.stock[e.id] ?? 0;
+      const price = priceToBuy(P, shop, e);
+      const n = Math.min(this.bulk, have);
+      const can = have > 0 && P.runes >= price;
+      const row = this.add2(this.add.rectangle(b.x + 28, y, b.w - 56, 42, 0x14171f)
+        .setOrigin(0, 0).setStrokeStyle(1, C.edgeDim, 0.6));
+      this.icon(b.x + 34, y + 2, e.id, 0.95);
+      this.add2(txt(this, b.x + 34 + ICON, y + 5, it.name, 19, have ? C.text : C.dim));
+      this.add2(txt(this, b.x + 34 + ICON, y + 25, this.statLine(it), 15, C.dim));
+      this.add2(txt(this, b.x + b.w - 330, y + 12, have > 0 ? (e.restock ? `stock ${have}` : `last one`) : 'sold out', 16, have ? C.dim : C.danger).setOrigin(1, 0));
+      this.add2(txt(this, b.x + b.w - 212, y + 10, `${price}`, 20, can ? C.gold : C.danger).setOrigin(1, 0));
+      const btn = button(this, b.x + b.w - 190, y + 5, 156, 32, n > 1 ? `Buy ×${n}` : 'Buy', () => {
+        const spent = buyFrom(P, shop, e, this.bulk);
+        if (spent) { sfx.pickup(); this.log(`Bought ${it.name}${this.bulk > 1 ? ` ×${this.bulk}` : ''} for ${spent}.`, C.gold); }
+        else sfx.fail();
         this.rebuild();
       }, can, 17);
+      this.add2(btn.bg); this.add2(btn.label);
+      row.setInteractive().on('pointerover', () => this.showTip(it, b.x + 30, y + 46));
+    });
+  }
+
+  shopSellList(b: { x: number; y: number; w: number; h: number }, shop: ShopDef) {
+    const P = this.g.P;
+    const rows = sellable(P, shop);
+    const junk = rows.filter(s => ITEMS[s.id].kind === 'trade');
+    const junkValue = junk.reduce((a, s) => a + priceToSell(P, shop, s.id) * s.qty, 0);
+    if (junkValue > 0) {
+      const btn = button(this, b.x + b.w - 300, b.y + 124, 266, 32, `Sell all trade goods  (${junkValue})`, () => {
+        let total = 0;
+        for (const s of [...junk]) total += sellTo(P, shop, s.id, s.qty);
+        sfx.pickup();
+        this.log(`Sold ${junk.length} lot${junk.length === 1 ? '' : 's'} for ${total} runes.`, C.gold);
+        this.rebuild();
+      }, true, 17);
+      this.add2(btn.bg); this.add2(btn.label);
+    }
+    if (!rows.length) { this.add2(txt(this, b.x + 30, b.y + 180, 'Nothing here they will take.', 19, C.dim)); return; }
+    rows.slice(0, 9).forEach((s, i) => {
+      const it = ITEMS[s.id];
+      const y = b.y + 168 + i * 46;
+      const unit = priceToSell(P, shop, s.id);
+      const n = Math.min(this.bulk, s.qty);
+      const premium = it.goods && (shop.pays[it.goods] ?? 1) > 1.05;
+      const row = this.add2(this.add.rectangle(b.x + 28, y, b.w - 56, 42, premium ? 0x1a2018 : 0x14171f)
+        .setOrigin(0, 0).setStrokeStyle(1, premium ? C.edge : C.edgeDim, premium ? 0.8 : 0.6));
+      this.icon(b.x + 34, y + 2, s.id, 0.95);
+      this.add2(txt(this, b.x + 34 + ICON, y + 5, `${it.name}  ×${s.qty}`, 19, C.text));
+      this.add2(txt(this, b.x + 34 + ICON, y + 25, `${it.goods ?? 'goods'}${premium ? '  — wanted here' : ''}`, 15, premium ? C.good : C.dim));
+      this.add2(txt(this, b.x + b.w - 212, y + 10, `${unit * n}`, 20, C.gold).setOrigin(1, 0));
+      const btn = button(this, b.x + b.w - 190, y + 5, 156, 32, n > 1 ? `Sell ×${n}` : 'Sell', () => {
+        const got = sellTo(P, shop, s.id, this.bulk);
+        if (got) { sfx.pickup(); this.log(`Sold ${it.name}${n > 1 ? ` ×${n}` : ''} for ${got}.`, C.gold); }
+        this.rebuild();
+      }, true, 17);
+      this.add2(btn.bg); this.add2(btn.label);
+      row.setInteractive().on('pointerover', () => this.showTip(it, b.x + 30, y + 46));
+    });
+  }
+
+  // ------------------------------------------------------------ contracts
+  buildContracts() {
+    const P = this.g.P;
+    const b = this.box(900, 600, 'NOTICE BOARD');
+    const tier = this.g.gen.tierAt(Math.round(P.x), Math.round(P.y));
+    const board = currentBoard(P, this.g.gen.seed, tier);
+    this.add2(txt(this, b.x + 30, b.y + 56, 'Work posted at Lanternhold. Reposted as the days turn.', 17, C.dim));
+    this.add2(txt(this, b.x + b.w - 30, b.y + 56, `RUNES  ${P.runes}`, 20, C.gold).setOrigin(1, 0));
+
+    if (!board.length) { this.add2(txt(this, b.x + 30, b.y + 120, 'Nothing posted. Come back when the day turns.', 19, C.dim)); return; }
+
+    board.forEach((c, i) => {
+      const y = b.y + 96 + i * 150;
+      this.panelG.fillStyle(0x12141c, 1).fillRect(b.x + 28, y, b.w - 56, 138);
+      this.panelG.lineStyle(1, C.edgeDim, 0.7).strokeRect(b.x + 28.5, y + 0.5, b.w - 57, 137);
+      const taken = !!P.taken[c.id];
+      const have = contractProgress(P, c);
+      const done = have >= c.need;
+      this.add2(txt(this, b.x + 46, y + 12, c.title, 21, taken ? C.goldHi : C.text));
+      this.add2(txt(this, b.x + 46, y + 38, c.posted, 16, C.dim, b.w - 300));
+      const what = c.kind === 'kill'
+        ? `Slay ${c.need} × ${ENEMY_NAME(c.target)}`
+        : `Deliver ${c.need} × ${ITEMS[c.target]?.name ?? c.target}`;
+      this.add2(txt(this, b.x + 46, y + 98, what, 18, C.text));
+      if (taken) this.add2(txt(this, b.x + 300, y + 98, `${Math.min(have, c.need)} / ${c.need}`, 18, done ? C.good : C.dim));
+      if (c.kind === 'fetch') this.icon(b.x + 46 + 230, y + 88, c.target, 0.7);
+
+      this.add2(txt(this, b.x + b.w - 46, y + 12, `${c.runes} runes`, 20, C.gold).setOrigin(1, 0));
+      if (c.reward) {
+        this.add2(txt(this, b.x + b.w - 46, y + 38, `+ ${ITEMS[c.reward.id]?.name ?? ''} ×${c.reward.qty}`, 16, C.dim).setOrigin(1, 0));
+        this.icon(b.x + b.w - 86, y + 56, c.reward.id, 0.7);
+      }
+      const label = !taken ? 'Take the work' : done ? 'Claim payment' : 'In progress';
+      const btn = button(this, b.x + b.w - 230, y + 96, 184, 32, label, () => {
+        if (!taken) { acceptContract(P, c); sfx.click(); this.log(`Took the contract: ${c.title}.`, C.gold); }
+        else if (turnInContract(P, c)) { sfx.level(); this.log(`Contract complete: ${c.title}. Paid ${c.runes} runes.`, C.goldHi); }
+        this.rebuild();
+      }, !taken || done, 17);
       this.add2(btn.bg); this.add2(btn.label);
     });
   }
@@ -717,7 +839,7 @@ export class UIScene extends Phaser.Scene {
       const btn = button(this, b.x + 30, y, b.w - 60, 32, `▸  ${o.label}`, () => {
         sfx.click();
         if (o.act === 'close') return this.close();
-        if (o.act === 'shop') { this.shopStock = def.shop ?? []; this.shopMode = 'buy'; return this.open('shop'); }
+        if (o.act === 'shop') { this.shop = SHOPS[def.id] ?? null; this.shopMode = 'buy'; this.bulk = 1; return this.open('shop'); }
         if (o.act === 'smith') return this.open('smith');
         if (o.act === 'chapter1') { this.g.P.flags.talked_elder = true; this.close(); return; }
         if (o.to) { this.dialogNode = o.to; this.rebuild(); }

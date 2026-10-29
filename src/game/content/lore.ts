@@ -105,10 +105,12 @@ export const NPCS: Record<string, NpcDef> = {
   },
   bellkeeper: {
     id: 'bellkeeper', name: 'The Bellkeeper', title: 'Keeper of the First Lamp', look: 'bellkeeper',
+    shop: [],
     nodes: {
       start: {
         text: 'Ah. The one who will not stay down.\n\nI keep the bell and I keep the lamp, and between the two of them I have kept this valley half-alive for four hundred years. You are the other half.',
         options: [
+          { label: 'Offer alms.', act: 'shop' },
           { label: 'Why do I come back?', to: 'why' },
           { label: 'What is the Hollow?', to: 'hollow' },
           { label: 'What are the lamps?', to: 'lamps' },
@@ -198,12 +200,13 @@ export const NPCS: Record<string, NpcDef> = {
     },
   },
   smith: {
-    id: 'smith', name: 'Hasket', title: 'Smith of the Ember Forge', look: 'smith', smith: true,
+    id: 'smith', name: 'Hasket', title: 'Smith of the Ember Forge', look: 'smith', smith: true, shop: [],
     nodes: {
       start: {
         text: 'Put it on the anvil. I will not ask where you have been swinging it.\n\nEmberglass for the edge. Bring enough and I will take any blade you own past what it was built for.',
         options: [
           { label: 'Reinforce a weapon.', act: 'smith' },
+          { label: 'Trade.', act: 'shop' },
           { label: 'What is in the back of the forge?', to: 'back' },
           { label: 'Leave.', act: 'close' },
         ],

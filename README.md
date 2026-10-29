@@ -30,6 +30,11 @@ keep you — so you get up, and you go and look at why the dark is spreading.
   weapons, each carrying a visual description the sprite baker reads. Equipping
   a halberd and a great helm re-bakes the character and the character is now
   holding a halberd and wearing a great helm.
+- **An economy with opinions.** Six merchants holding real stock that depletes
+  and restocks, prices that climb as a shelf thins, and traders who each pay a
+  premium for a different kind of goods — so *where* you sell a wolf pelt
+  matters as much as whether you found one. A notice board posts rotating
+  contracts to put runes back into circulation.
 - **Deep lore, told sideways.** Twenty-eight findable remnants, item
   descriptions that carry most of the story, seven speaking characters, five
   chapters and three endings.
@@ -70,6 +75,45 @@ and opens level-up, fast travel and the reinforcement bench.
 
 ---
 
+## The economy
+
+Runes are both currency and experience, so every purchase is a level you did
+not take. What you do with them is the game's only real resource decision.
+
+**Merchants hold stock.** Each line has a quantity and a restock rate. Tonics
+and knives come back as the days turn; a one-off piece of armour says *last
+one* and means it. Prices scale with scarcity — the last bandage on the shelf
+costs noticeably more than the first, and selling into a shop pads its shelf
+and softens the price next time.
+
+**Traders want different things.** Every trade good carries a category — beast,
+relic, occult, metal, herb, common, arms — and every merchant pays a premium
+for some and refuses others outright:
+
+| | pays well for | will not take |
+|---|---|---|
+| Tobin the trader | relic, common, occult | — |
+| Ilsa the hunter | **beast**, herb, arms | relic |
+| Wren the herbalist | **herb**, occult, beast | arms |
+| Roderic, last Lanternsworn | arms, metal, relic | — |
+| Hasket the smith | **metal**, arms | herb |
+| The Bellkeeper | **occult**, relic | beast, common |
+
+A wolf pelt fetches 57 runes at Ilsa's camp and 29 at the forge. A silver
+reliquary is 202 from the Bellkeeper, 105 from Hasket, and Ilsa will not touch
+it. Carrying loot to the right counter is worth the walk.
+
+**Trade goods** exist purely to be sold — pelts, hides, drowned coin, grave
+wax, hollow teeth, reliquaries, choir handbells. A *Sell all trade goods*
+button clears the lot at the current counter's rates.
+
+**The notice board** at Lanternhold posts three contracts at a time, reposted
+as the days turn: slay so many of a thing, or deliver so many of a good. They
+pay runes and often an item, and they are the main faucet putting currency back
+into the world.
+
+---
+
 ## How the art works
 
 This is the part worth reading if you are extending the project.
@@ -106,6 +150,12 @@ So characters are not drawn. They are **posed**.
 `art/beast.ts` is the same idea for quadrupeds, with a diagonal-pair gait and
 front legs that bend the opposite way to the hind legs.
 
+Item icons come from the same painters: a weapon's inventory icon is drawn by
+the exact routine that draws it in the character's hand, so the icon is
+literally the thing you will be holding. Armour icons are built from the same
+`ArmorVis` description the sprite baker reads, which means a new set needs one
+definition and gets a character sprite, a paper-doll portrait and an icon.
+
 ### Everything else is drawn the same way
 
 `art/raster.ts` is a small software rasteriser (tapered capsules, convex
@@ -122,6 +172,8 @@ The rasteriser is deliberately free of Phaser imports so it can run under Node:
 ```bash
 npm run preview:rig   -- /tmp/rig.png walk,attack1 player 4 0,2,4
 npm run preview:beast -- /tmp/deer.png walk deer
+npm run preview:gear  -- /tmp/gear.png idle 2      # every armour set, worn
+npm run preview:icons -- /tmp/icons.png            # every item icon, labelled
 npm run preview:props -- /tmp/props.png
 npm run preview:world -- /tmp/world.png 1337 360
 ```
@@ -135,7 +187,7 @@ iterate on a pose or a building without a browser in the loop.
 src/game/
   art/        rasteriser, rig, animation clips, painters, bakers, palette
   world/      tile and prop tables, biomes, chunk generator, structures, streaming
-  content/    items, enemies, bosses, lore and dialogue, chapter spine
+  content/    items, enemies, bosses, shops, contracts, lore, chapter spine
   scenes/     title, game, UI
   ui/         shared panel widgets
   actor.ts    one class for the player, enemies, bosses and NPCs
@@ -146,8 +198,9 @@ scripts/      preview tools, headless playtest, itch.io packaging
 
 ## Deploying
 
+- **Play it now:** <https://eeman1113.github.io/hollowmere/>
 - **GitHub Pages** — the workflow in `.github/workflows/deploy.yml` builds with
-  `NEXT_PUBLIC_BASE_PATH=/<repo>` and publishes `out/`.
+  `NEXT_PUBLIC_BASE_PATH=/<repo>` and publishes `out/` on every push to `main`.
 - **itch.io** — `npm run itch` produces `dist/hollowmere-itch.zip` with
   document-relative asset paths (itch serves from an opaque subdirectory, which
   breaks root-relative URLs). Upload it, tick *"This file will be played in the

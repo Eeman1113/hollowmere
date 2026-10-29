@@ -13,7 +13,8 @@
     "preview:beast": "node --no-warnings --import ./scripts/ts-reg.mjs scripts/preview-beast.mjs",
     "preview:props": "node --no-warnings --import ./scripts/ts-reg.mjs scripts/preview-props.mjs",
     "preview:world": "node --no-warnings --import ./scripts/ts-reg.mjs scripts/preview-world.mjs",
-    "preview:gear": "node --no-warnings --import ./scripts/ts-reg.mjs scripts/preview-gear.mjs"
+    "preview:gear": "node --no-warnings --import ./scripts/ts-reg.mjs scripts/preview-gear.mjs",
+    "preview:icons": "node --no-warnings --import ./scripts/ts-reg.mjs scripts/preview-icons.mjs"
   },
   "dependencies": {
     "next": "16.4.3",

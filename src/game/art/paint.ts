@@ -86,9 +86,18 @@ function drawWeapon(px: Px, w: WeaponVis, hand: V3, grip: V3, ox: number, oy: nu
   if (w.shape === 'none') return;
   const g = norm(grip);
   const H = project(hand, ox, oy, spin);
-  const L = w.len;
-  const tip3 = add(hand, scale(g, L));
-  const T = project(tip3, ox, oy, spin);
+  const T = project(add(hand, scale(g, w.len)), ox, oy, spin);
+  drawWeapon2D(px, w, H.x, H.y, T.x, T.y);
+}
+
+/**
+ * Draws a weapon between two screen points. Shared by the character painter and
+ * the inventory icons, so an icon is literally the weapon you will be holding.
+ */
+export function drawWeapon2D(px: Px, w: WeaponVis, hx: number, hy: number, tx: number, ty: number) {
+  if (w.shape === 'none') return;
+  const H = { x: hx, y: hy, d: 0 };
+  const T = { x: tx, y: ty, d: 0 };
   let dx = T.x - H.x, dy = T.y - H.y;
   const dl = Math.hypot(dx, dy) || 1;
   dx /= dl; dy /= dl;
@@ -222,6 +231,24 @@ function drawWeapon(px: Px, w: WeaponVis, hand: V3, grip: V3, ox: number, oy: nu
       break;
     }
   }
+}
+
+/** Flat, face-on shield for inventory icons. */
+export function drawShield2D(px: Px, s: ShieldVis, cx: number, cy: number, rx: number, h: number) {
+  if (s.shape === 'none') return;
+  if (s.shape === 'kite') {
+    px.poly([{ x: cx, y: cy - h * 0.6 }, { x: cx + rx, y: cy - h * 0.2 }, { x: cx + rx * 0.5, y: cy + h * 0.7 }, { x: cx - rx * 0.5, y: cy + h * 0.7 }, { x: cx - rx, y: cy - h * 0.2 }], shade(s.main, 0.78));
+    px.poly([{ x: cx, y: cy - h * 0.46 }, { x: cx + rx * 0.74, y: cy - h * 0.14 }, { x: cx + rx * 0.37, y: cy + h * 0.54 }, { x: cx - rx * 0.37, y: cy + h * 0.54 }, { x: cx - rx * 0.74, y: cy - h * 0.14 }], s.main);
+  } else if (s.shape === 'tower') {
+    px.rect(cx - rx, cy - h * 0.55, rx * 2, h, shade(s.main, 0.78));
+    px.rect(cx - rx + 2, cy - h * 0.55 + 2, rx * 2 - 4, h - 4, s.main);
+    px.rect(cx - 1.5, cy - h * 0.55, 3, h, s.trim);
+  } else {
+    px.ellipse(cx, cy, rx, h * 0.5, shade(s.main, 0.76));
+    px.ellipse(cx - 1, cy - 1, rx * 0.84, h * 0.42, s.main);
+  }
+  if (s.boss) px.ellipse(cx - 0.5, cy - 0.5, Math.max(1.5, rx * 0.26), Math.max(1.5, h * 0.17), s.boss);
+  px.ellipse(cx, cy, rx * 0.5, h * 0.26, s.trim, 0.0);
 }
 
 function drawShield(px: Px, s: ShieldVis, hand: V3, facing: V3, chest: V3, ox: number, oy: number, spin: number) {

@@ -7,6 +7,7 @@ import type { Marker } from '../world/structures';
 import { Actor } from '../actor';
 import { bakeNow, getBaked, makeGlow, makeLightMask, makeShadow, makeSwatch, pumpBake, bakeQueued, type Baked } from '../art/bake';
 import { makeTileAtlas } from '../art/tiles';
+import { makeIconAtlas } from '../art/icons';
 import { ENEMY_CLIPS, NPC_CLIPS, PLAYER_CLIPS } from '../art/anim';
 import { BEASTS, LOOKS } from '../art/looks';
 import { bakeBeast } from '../art/bakebeast';
@@ -93,6 +94,7 @@ export class GameScene extends Phaser.Scene {
     if (save) { this.gen.loadEdits(save.edits); this.killed = new Set(save.killed); }
 
     makeTileAtlas(this);
+    makeIconAtlas(this);
     makeShadow(this);
     makeGlow(this, 'glow_warm', P.flame, 96);
     makeGlow(this, 'glow_cold', P.hollow, 80);
@@ -760,7 +762,10 @@ export class GameScene extends Phaser.Scene {
     if (key) this.killed.add(key);
     const def = a.def;
     if (!def) return;
-    this.P.runes += Math.round(a.runes * talismanMods(this.P).runeMul);
+    this.P.kills[def.id] = (this.P.kills[def.id] ?? 0) + 1;
+    const gained = Math.round(a.runes * talismanMods(this.P).runeMul);
+    this.P.runes += gained;
+    this.P.earned += gained;
     this.popText(a.x, a.y, `+${a.runes}`, '#e8c070');
     for (const [id, chance, lo, hi] of def.drops) {
       if (Math.random() > chance) continue;
@@ -931,6 +936,7 @@ export class GameScene extends Phaser.Scene {
         if (o === O.LANTERN) found = { kind: 'lantern', x, y, label: 'Rest at Lantern' };
         else if (o === O.NOTE) found = { kind: 'note', x, y, label: 'Read remnant' };
         else if (o === O.ANVIL) found = { kind: 'smith', x, y, label: 'Use the anvil' };
+        else if (o === O.BOARD) found = { kind: 'board', x, y, label: 'Read the notice board' };
         else if (CONTAINERS.has(o)) found = { kind: 'container', x, y, label: `Search ${OBJ_NAME[o] ?? 'it'}` };
         else if (HARVEST.has(o)) found = { kind: 'harvest', x, y, label: `Gather ${OBJ_NAME[o] ?? 'it'}` };
         else if (o === O.SIGN) found = { kind: 'note', x, y, label: 'Read the sign' };
@@ -951,6 +957,7 @@ export class GameScene extends Phaser.Scene {
       case 'lantern': this.restAtLantern(t.x, t.y); break;
       case 'note': this.readNote(t.x, t.y); break;
       case 'smith': this.ui.openPanel('smith'); break;
+      case 'board': this.ui.openPanel('contracts'); break;
       case 'container': this.searchContainer(t.x, t.y); break;
       case 'harvest': this.harvest(t.x, t.y); break;
       case 'blood': {

@@ -7,7 +7,10 @@ import { shade, mix, type Col } from '../art/raster';
 import type { ArmorVis, HelmVis, ShieldVis, WeaponVis } from '../art/look';
 
 export type Slot = 'weapon' | 'offhand' | 'helm' | 'chest' | 'arms' | 'legs' | 'talisman';
-export type ItemKind = Slot | 'consumable' | 'material' | 'key' | 'ash';
+export type ItemKind = Slot | 'consumable' | 'material' | 'trade' | 'key' | 'ash';
+
+/** What a merchant considers the item to be, for buying interest. */
+export type Goods = 'beast' | 'relic' | 'occult' | 'metal' | 'herb' | 'common' | 'arms';
 
 export interface Scaling { str: number; dex: number; fth: number; arc: number }
 export const SC = (str = 0, dex = 0, fth = 0, arc = 0): Scaling => ({ str, dex, fth, arc });
@@ -24,6 +27,8 @@ export interface ItemDef {
   /** Item description — this is where most of the lore lives. */
   desc: string;
   stack?: boolean;
+  /** Trade category — drives what each merchant will pay over the odds for. */
+  goods?: Goods;
 
   // --- weapon
   dmg?: number;
@@ -264,19 +269,31 @@ export const ITEMS: Record<string, ItemDef> = {
 
   // ============================================================ consumables
   lantern_oil: { id: 'lantern_oil', name: 'Flask of Lantern Oil', kind: 'consumable', tier: 0, weight: 0, value: 0, stack: true, desc: 'Drink it. Nobody can explain why this works, only that it does, and only near a lit lamp.', healPct: 0.5 },
-  bandage: { id: 'bandage', name: 'Bandage', kind: 'consumable', tier: 0, weight: 0.1, value: 30, stack: true, desc: 'Linen torn from something that is not being used any more.', heal: 60, cures: true },
-  bloodwort_tonic: { id: 'bloodwort_tonic', name: 'Bloodwort Tonic', kind: 'consumable', tier: 1, weight: 0.3, value: 90, stack: true, desc: 'Bitter as a grudge. Wren brews it for the hunters and pretends not to know what they do.', heal: 140, cures: true },
-  whetstone: { id: 'whetstone', name: 'Oiled Whetstone', kind: 'consumable', tier: 1, weight: 0.2, value: 120, stack: true, desc: 'Sixty seconds of a better edge.', buff: { stat: 'dmg', mul: 1.25, secs: 60 } },
-  ash_resin: { id: 'ash_resin', name: 'Ash Resin', kind: 'consumable', tier: 2, weight: 0.2, value: 150, stack: true, desc: 'Tarry stuff scraped from the Barrens. Hardens on the skin and on nothing else.', buff: { stat: 'def', mul: 0.78, secs: 60 } },
-  throwing_knife: { id: 'throwing_knife', name: 'Throwing Knife', kind: 'consumable', tier: 0, weight: 0.2, value: 25, stack: true, desc: 'For the archer on the tower, or the thing across the bog.', throwDmg: 40 },
-  firebomb: { id: 'firebomb', name: 'Pitch Firebomb', kind: 'consumable', tier: 1, weight: 0.5, value: 70, stack: true, desc: 'Beasts hate it. So does everyone standing nearby.', throwDmg: 95 },
+  bandage: { id: 'bandage', goods: 'common', name: 'Bandage', kind: 'consumable', tier: 0, weight: 0.1, value: 30, stack: true, desc: 'Linen torn from something that is not being used any more.', heal: 60, cures: true },
+  bloodwort_tonic: { id: 'bloodwort_tonic', goods: 'herb', name: 'Bloodwort Tonic', kind: 'consumable', tier: 1, weight: 0.3, value: 90, stack: true, desc: 'Bitter as a grudge. Wren brews it for the hunters and pretends not to know what they do.', heal: 140, cures: true },
+  whetstone: { id: 'whetstone', goods: 'metal', name: 'Oiled Whetstone', kind: 'consumable', tier: 1, weight: 0.2, value: 120, stack: true, desc: 'Sixty seconds of a better edge.', buff: { stat: 'dmg', mul: 1.25, secs: 60 } },
+  ash_resin: { id: 'ash_resin', goods: 'herb', name: 'Ash Resin', kind: 'consumable', tier: 2, weight: 0.2, value: 150, stack: true, desc: 'Tarry stuff scraped from the Barrens. Hardens on the skin and on nothing else.', buff: { stat: 'def', mul: 0.78, secs: 60 } },
+  throwing_knife: { id: 'throwing_knife', goods: 'arms', name: 'Throwing Knife', kind: 'consumable', tier: 0, weight: 0.2, value: 25, stack: true, desc: 'For the archer on the tower, or the thing across the bog.', throwDmg: 40 },
+  firebomb: { id: 'firebomb', goods: 'arms', name: 'Pitch Firebomb', kind: 'consumable', tier: 1, weight: 0.5, value: 70, stack: true, desc: 'Beasts hate it. So does everyone standing nearby.', throwDmg: 95 },
 
   // ============================================================== materials
-  emberglass: { id: 'emberglass', name: 'Emberglass', kind: 'material', tier: 1, weight: 0.1, value: 60, stack: true, desc: 'Glass that cooled around a flame and kept it. The Forge takes these in trade for an edge.' },
-  rune_shard: { id: 'rune_shard', name: 'Rune Shard', kind: 'material', tier: 1, weight: 0, value: 0, stack: true, desc: 'A sliver of someone\'s remaining self. Spend it before something else does.' },
-  beast_bone: { id: 'beast_bone', name: 'Beast Bone', kind: 'material', tier: 1, weight: 0.3, value: 40, stack: true, desc: 'Too long for the limb it came out of.' },
-  pale_ash: { id: 'pale_ash', name: 'Pale Ash', kind: 'material', tier: 2, weight: 0.1, value: 90, stack: true, desc: 'What the Choir leave behind. It does not blow away in wind.' },
-  hollow_marrow: { id: 'hollow_marrow', name: 'Hollow Marrow', kind: 'material', tier: 3, weight: 0.2, value: 180, stack: true, desc: 'Cold, and faintly lit from inside. The Forge will not handle it without tongs.' },
+  emberglass: { id: 'emberglass', goods: 'metal', name: 'Emberglass', kind: 'material', tier: 1, weight: 0.1, value: 60, stack: true, desc: 'Glass that cooled around a flame and kept it. The Forge takes these in trade for an edge.' },
+  rune_shard: { id: 'rune_shard', goods: 'occult', name: 'Rune Shard', kind: 'material', tier: 1, weight: 0, value: 0, stack: true, desc: 'A sliver of someone\'s remaining self. Spend it before something else does.' },
+  beast_bone: { id: 'beast_bone', goods: 'beast', name: 'Beast Bone', kind: 'material', tier: 1, weight: 0.3, value: 40, stack: true, desc: 'Too long for the limb it came out of.' },
+  pale_ash: { id: 'pale_ash', goods: 'occult', name: 'Pale Ash', kind: 'material', tier: 2, weight: 0.1, value: 90, stack: true, desc: 'What the Choir leave behind. It does not blow away in wind.' },
+  hollow_marrow: { id: 'hollow_marrow', goods: 'occult', name: 'Hollow Marrow', kind: 'material', tier: 3, weight: 0.2, value: 180, stack: true, desc: 'Cold, and faintly lit from inside. The Forge will not handle it without tongs.' },
+
+  // ============================================================ trade goods
+  // These exist only to be sold. Where you sell them matters.
+  wolf_pelt: { id: 'wolf_pelt', goods: 'beast', name: 'Wolf Pelt', kind: 'trade', tier: 0, weight: 1.2, value: 55, stack: true, desc: 'Thick grey winter fur, taken off a thing that was already thin. Ilsa will not ask how you got it; she will ask how many.' },
+  beast_hide: { id: 'beast_hide', goods: 'beast', name: 'Beast Hide', kind: 'trade', tier: 1, weight: 2, value: 95, stack: true, desc: 'Too thick for a boar and the wrong shape for a man. Tanners in better valleys pay for the curiosity alone.' },
+  hollow_tooth: { id: 'hollow_tooth', goods: 'occult', name: 'Hollow Tooth', kind: 'trade', tier: 2, weight: 0.1, value: 130, stack: true, desc: 'Comes out clean, root and all, with no blood on it. They grow back. The Reach used to collect them by the barrel and nobody will say what for.' },
+  silver_reliquary: { id: 'silver_reliquary', goods: 'relic', name: 'Silver Reliquary', kind: 'trade', tier: 2, weight: 0.8, value: 210, stack: true, desc: 'A finger-bone in a silver house. The name on the base has been filed off by someone who knew it was worth more anonymous.' },
+  choir_bell: { id: 'choir_bell', goods: 'relic', name: 'Choir Handbell', kind: 'trade', tier: 3, weight: 0.6, value: 280, stack: true, desc: 'It will not ring. Shake it as hard as you like. Collectors in the hamlets pay more for the ones that will not ring.' },
+  grave_wax: { id: 'grave_wax', goods: 'occult', name: 'Grave Wax', kind: 'trade', tier: 2, weight: 0.4, value: 160, stack: true, desc: 'Rendered off the long-interred. Burns clean, smells of almost nothing, and keeps a flame going far past when it should have guttered.' },
+  drowned_coin: { id: 'drowned_coin', goods: 'relic', name: 'Drowned Coin', kind: 'trade', tier: 1, weight: 0.1, value: 90, stack: true, desc: 'Minted in a reign nobody in Lanternhold can place. Tobin takes them at face value and has never once explained what face that is.' },
+  fen_salt: { id: 'fen_salt', goods: 'common', name: 'Fen Salt', kind: 'trade', tier: 0, weight: 0.5, value: 35, stack: true, desc: 'Scraped off the bog crust where the water has gone and not come back. It cures meat and it cures nothing else, whatever Wren says.' },
+  pilgrim_badge: { id: 'pilgrim_badge', goods: 'relic', name: 'Pilgrim\'s Badge', kind: 'trade', tier: 1, weight: 0.1, value: 120, stack: true, desc: 'Lead, stamped with a lamp. Worn by those who walked to the Reach. Most of them are still on the road in one form or another.' },
 
   // ==================================================================== keys
   bell_key: { id: 'bell_key', name: 'Bellkeeper\'s Key', kind: 'key', tier: 0, weight: 0, value: 0, desc: 'Opens the stair under the Cathedral. The Bellkeeper gave it up too easily.' },

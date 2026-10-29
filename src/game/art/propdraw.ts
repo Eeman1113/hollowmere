@@ -25,6 +25,7 @@ export const HEIGHT_UNITS: Partial<Record<number, number>> = {
   [O.TREE_DEAD]: 4, [O.TREE_PALE]: 5, [O.TREE_PINE]: 5, [O.TREE_ROT]: 4, [O.CRAG]: 4,
   [O.BOULDER]: 2, [O.CRYSTAL]: 2, [O.BOOKSHELF]: 2, [O.WHEEL]: 3, [O.LADDER]: 3,
   [O.FOG_WALL]: 3, [O.BRIDGE_RAIL]: 1, [O.OSSUARY]: 2, [O.CANDLE_RACK]: 2, [O.IRON_FENCE]: 1,
+  [O.BOARD]: 2,
 };
 
 export const unitsFor = (o: number, h: number) => (h > 1 ? h : HEIGHT_UNITS[o] ?? 1);
@@ -738,6 +739,23 @@ export function paintProp(o: number, c: Ctx) {
       const hPx = units * UNIT;
       for (const dx of [-5, 5]) px.capsule(cx + dx, by - 1, cx + dx, by - hPx, 1.4, 1.2, wood);
       for (let k = 0; k * 7 < hPx; k++) px.capsule(cx - 5, by - 4 - k * 7, cx + 5, by - 4 - k * 7, 1, 1, shade(wood, 1.1));
+      break;
+    }
+    case O.BOARD: {
+      // a parish notice board, papered over many times and never cleared
+      for (const dx of [-16, 16]) px.capsule(cx + dx, by - 1, cx + dx, by - 34, 2.4, 2.0, wood);
+      px.poly([{ x: cx - 19, y: by - 14 }, { x: cx + 19, y: by - 17 }, { x: cx + 19, y: by - 38 }, { x: cx - 19, y: by - 35 }], shade(wood, 0.82));
+      px.poly([{ x: cx - 17, y: by - 15 }, { x: cx + 17, y: by - 18 }, { x: cx + 17, y: by - 36 }, { x: cx - 17, y: by - 33 }], shade(wood, 1.02));
+      gable(px, cx, by - 36, 9, TW * 0.64, shade(P.slate, 1.0));
+      let sx = cx - 14;
+      for (let i = 0; i < 4; i++) {
+        const w = 6 + (r() * 5) | 0, h = 8 + (r() * 6) | 0;
+        const yy = by - 32 + ((r() * 6) | 0);
+        px.poly([{ x: sx, y: yy }, { x: sx + w, y: yy - 1 }, { x: sx + w, y: yy + h }, { x: sx, y: yy + h + 1 }], i === 0 ? P.linen : shade(P.linen, 0.84 + r() * 0.2));
+        for (let k = 1; k < 4; k++) px.line(sx + 1, yy + k * 2.2, sx + w - 1, yy + k * 2.2 - 1, shade(P.linen, 0.55));
+        px.set(sx + 1, yy + 1, P.rust);
+        sx += w + 1;
+      }
       break;
     }
     case O.SIGN: {

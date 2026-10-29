@@ -107,6 +107,7 @@ export const O = {
   SHARD: 73,
   LADDER: 74,
   SIGN: 75,
+  BOARD: 76,
 } as const;
 export type O = (typeof O)[keyof typeof O];
 
@@ -117,7 +118,7 @@ export const BLOCKING = new Set<O>([
   O.STATUE_SAINT, O.STATUE_BEAST, O.GARGOYLE, O.TOMB, O.COFFIN, O.OSSUARY,
   O.BRAZIER, O.LAMP_POST, O.CANDLE_RACK, O.PYRE, O.WHEEL, O.BELL, O.GIBBET,
   O.IRON_FENCE, O.WOOD_FENCE, O.WELL, O.CART, O.CRATE, O.BARREL, O.TABLE, O.ANVIL, O.CAULDRON, O.BOOKSHELF,
-  O.LANTERN, O.CHEST, O.ALTAR, O.ORE, O.SKULL_PILE, O.GRAVE_SLAB,
+  O.LANTERN, O.CHEST, O.ALTAR, O.ORE, O.SKULL_PILE, O.GRAVE_SLAB, O.BOARD,
 ]);
 
 /** Props tall enough to hide the player; they fade when walked behind. */
@@ -143,6 +144,7 @@ export const OBJ_NAME: Partial<Record<O, string>> = {
   [O.GRAVE_CROSS]: 'Grave', [O.GRAVE_SLAB]: 'Grave Slab', [O.TOMB]: 'Tomb', [O.STATUE_SAINT]: 'Effigy',
   [O.STATUE_BEAST]: 'Beast Effigy', [O.GARGOYLE]: 'Gargoyle', [O.GIBBET]: 'Gibbet', [O.BELL]: 'Bell',
   [O.LADDER]: 'Ladder', [O.FOG_WALL]: 'Wall of Fog', [O.BED]: 'Bed', [O.TABLE]: 'Table',
+  [O.BOARD]: 'Notice Board',
 };
 
 export type Biome =

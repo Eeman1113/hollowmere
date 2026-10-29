@@ -1,6 +1,8 @@
 // Player state, derived stats and saving.
 
-import { ARMOR_SETS, ITEMS, upgradeMul, type ItemDef, type Slot } from './content/items';
+import { ARMOR_SETS, ITEMS, upgradeMul, type Goods, type ItemDef, type Slot } from './content/items';
+import { buyPrice, sellPrice, SHOPS, type ShopDef, type StockEntry } from './content/shops';
+import { CONTRACT_CYCLE, rollContracts, type Contract } from './content/contracts';
 
 export type StatId = 'vigor' | 'endurance' | 'strength' | 'dexterity' | 'faith' | 'arcane';
 export const STATS: StatId[] = ['vigor', 'endurance', 'strength', 'dexterity', 'faith', 'arcane'];
@@ -44,6 +46,19 @@ export interface PlayerState {
   buffs: Record<string, { mul: number; until: number }>;
   twoHand: boolean;
   ending?: string;
+  /** Per-merchant stock levels and the time of their next restock. */
+  shops: Record<string, { stock: Record<string, number>; next: number }>;
+  /** Lifetime kills per enemy id, used by contracts. */
+  kills: Record<string, number>;
+  /** Accepted contracts, by id. */
+  taken: Record<string, { need: number; killsAt: number }>;
+  /** Completed contract ids. */
+  doneContracts: string[];
+  /** Which board cycle is currently posted. */
+  boardCycle: number;
+  /** Lifetime runes earned, for the stats panel. */
+  earned: number;
+  spent: number;
 }
 
 export function newPlayer(x: number, y: number): PlayerState {
@@ -64,6 +79,7 @@ export function newPlayer(x: number, y: number): PlayerState {
     flaskCur: 4, flaskMax: 4,
     flags: {}, lanterns: {}, lastLantern: null, bloodstain: null, remnants: [],
     deaths: 0, playSecs: 0, buffs: {}, twoHand: false,
+    shops: {}, kills: {}, taken: {}, doneContracts: [], boardCycle: -1, earned: 0, spent: 0,
   };
   p.hp = maxHp(p); p.stam = maxStam(p);
   return p;
@@ -114,12 +130,12 @@ export function activeSets(p: PlayerState) {
 }
 
 export function talismanMods(p: PlayerState) {
-  const m = { maxHp: 0, maxStam: 0, dmgMul: 1, defMul: 1, runeMul: 1, rollIFrames: 0, weightMax: 0, discovery: 0 };
+  const m = { maxHp: 0, maxStam: 0, dmgMul: 1, defMul: 1, runeMul: 1, rollIFrames: 0, weightMax: 0, discovery: 0, priceMul: 1 };
   for (const slot of ['talisman', 'talisman2'] as const) {
     const it = itemOf(p.equip[slot]);
     if (!it?.mods) continue;
     for (const [k, v] of Object.entries(it.mods)) {
-      if (k === 'dmgMul' || k === 'defMul' || k === 'runeMul') (m as Record<string, number>)[k] *= v as number;
+      if (k === 'dmgMul' || k === 'defMul' || k === 'runeMul' || k === 'priceMul') (m as Record<string, number>)[k] *= v as number;
       else (m as Record<string, number>)[k] += v as number;
     }
   }
@@ -198,6 +214,122 @@ export function equip(p: PlayerState, id: string, preferSecond = false) {
   p.equip[slot] = id;
   return true;
 }
+
+// ------------------------------------------------------------- economy
+/** Lazily create a shop's stock and apply any restocks that are due. */
+export function shopState(p: PlayerState, shop: ShopDef) {
+  let st = p.shops[shop.id];
+  if (!st) {
+    st = { stock: {}, next: p.playSecs + shop.restockEvery };
+    for (const e of shop.stock) st.stock[e.id] = e.qty;
+    p.shops[shop.id] = st;
+  }
+  while (p.playSecs >= st.next) {
+    for (const e of shop.stock) {
+      if (!e.restock) continue;
+      st.stock[e.id] = Math.min(e.qty, (st.stock[e.id] ?? 0) + e.restock);
+    }
+    st.next += shop.restockEvery;
+  }
+  return st;
+}
+
+export const shopPriceMul = (p: PlayerState) => talismanMods(p).priceMul;
+
+/** What this shop charges you for one unit right now. */
+export function priceToBuy(p: PlayerState, shop: ShopDef, entry: StockEntry) {
+  const it = ITEMS[entry.id];
+  if (!it) return 0;
+  const have = shopState(p, shop).stock[entry.id] ?? 0;
+  return buyPrice(shop, it.value, entry, have, shopPriceMul(p));
+}
+
+/** What this shop pays you for one unit right now. 0 means they refuse it. */
+export function priceToSell(p: PlayerState, shop: ShopDef, id: string) {
+  const it = ITEMS[id];
+  if (!it || it.kind === 'key' || it.value <= 0) return 0;
+  return sellPrice(shop, it.value, it.goods as Goods | undefined, 1 / Math.max(0.5, shopPriceMul(p)));
+}
+
+export function buyFrom(p: PlayerState, shop: ShopDef, entry: StockEntry, qty = 1) {
+  const st = shopState(p, shop);
+  const have = st.stock[entry.id] ?? 0;
+  const n = Math.min(qty, have);
+  if (n <= 0) return 0;
+  let spent = 0;
+  for (let i = 0; i < n; i++) {
+    const price = priceToBuy(p, shop, entry);
+    if (p.runes < price) break;
+    p.runes -= price;
+    spent += price;
+    st.stock[entry.id] = (st.stock[entry.id] ?? 0) - 1;
+    addItem(p, entry.id, 1);
+  }
+  p.spent += spent;
+  return spent;
+}
+
+export function sellTo(p: PlayerState, shop: ShopDef, id: string, qty = 1) {
+  const unit = priceToSell(p, shop, id);
+  if (!unit) return 0;
+  const n = Math.min(qty, countItem(p, id));
+  if (n <= 0) return 0;
+  removeItem(p, id, n);
+  const total = unit * n;
+  p.runes += total;
+  p.earned += total;
+  // selling into a shop pads its shelf, which softens the price next time
+  const st = shopState(p, shop);
+  if (st.stock[id] !== undefined) st.stock[id] += n;
+  return total;
+}
+
+/** Everything in the pack this shop will actually take. */
+export function sellable(p: PlayerState, shop: ShopDef) {
+  return p.inv.filter(s => {
+    const it = ITEMS[s.id];
+    if (!it) return false;
+    if (Object.values(p.equip).includes(s.id)) return false;
+    return priceToSell(p, shop, s.id) > 0;
+  });
+}
+
+// ------------------------------------------------------------- contracts
+export function currentBoard(p: PlayerState, seed: number, tier: number): Contract[] {
+  const cycle = Math.floor(p.playSecs / CONTRACT_CYCLE);
+  if (p.boardCycle !== cycle) {
+    // keep anything already accepted; only unclaimed slots get reposted
+    p.boardCycle = cycle;
+  }
+  return rollContracts(seed, cycle, tier).filter(c => !p.doneContracts.includes(c.id));
+}
+
+export const contractProgress = (p: PlayerState, c: Contract) =>
+  c.kind === 'kill'
+    ? Math.max(0, (p.kills[c.target] ?? 0) - (p.taken[c.id]?.killsAt ?? 0))
+    : countItem(p, c.target);
+
+export function acceptContract(p: PlayerState, c: Contract) {
+  if (p.taken[c.id]) return false;
+  p.taken[c.id] = { need: c.need, killsAt: p.kills[c.target] ?? 0 };
+  return true;
+}
+
+export function turnInContract(p: PlayerState, c: Contract) {
+  if (!p.taken[c.id]) return false;
+  if (contractProgress(p, c) < c.need) return false;
+  if (c.kind === 'fetch') removeItem(p, c.target, c.need);
+  const pay = Math.round(c.runes * talismanMods(p).runeMul);
+  p.runes += pay;
+  p.earned += pay;
+  if (c.reward) addItem(p, c.reward.id, c.reward.qty);
+  p.doneContracts.push(c.id);
+  delete p.taken[c.id];
+  return true;
+}
+
+export { SHOPS, CONTRACT_CYCLE };
+export type { Contract, ShopDef, StockEntry };
 
 // ------------------------------------------------------------------- save
 export interface SaveData {

@@ -494,6 +494,8 @@ const lanternhold: StructDef = {
     c.put(cx + 6, cy - 4, { o: O.NOTE });
     c.mark({ kind: 'note', x: cx + 6, y: cy - 4, id: 'opening' });
     c.put(cx - 2, cy + 6, { o: O.SIGN });
+    c.put(cx + 3, cy - 5, { o: O.BOARD });
+    c.mark({ kind: 'poi', x: cx + 3, y: cy - 5, id: 'board' });
   },
 };
 
