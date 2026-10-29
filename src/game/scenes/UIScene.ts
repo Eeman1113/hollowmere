@@ -117,7 +117,7 @@ export class UIScene extends Phaser.Scene {
   banner(title: string, sub: string) {
     this.bannerBox?.destroy();
     const { width: w, height: h } = this.scale;
-    const c = this.add.container(w / 2, h * 0.36).setDepth(45);
+    const c = this.add.container(w / 2, h * 0.36).setDepth(38);
     const g = this.add.graphics();
     g.fillStyle(0x000000, 0.55).fillRect(-280, -40, 560, 80);
     g.lineStyle(1, C.edge, 0.8).lineBetween(-250, -40, 250, -40).lineBetween(-250, 40, 250, 40);
@@ -332,6 +332,8 @@ export class UIScene extends Phaser.Scene {
     else this.open(p);
   }
   open(p: Exclude<Panel, null>) {
+    // a lingering banner must not sit on top of a full-screen panel
+    if (p === 'ending' || p === 'death' || p === 'remnant') { this.bannerBox?.destroy(); this.bannerBox = undefined; }
     this.panel = p;
     sfx.click();
     this.setPrompt(null);
