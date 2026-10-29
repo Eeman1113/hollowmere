@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "next": "16.4.3",
+    "phaser": "^4.2.1",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
@@ -19,6 +20,8 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
+    "puppeteer-core": "^24.43.1",
+    "sharp": "^0.35.5",
     "typescript": "^5"
   }
 }

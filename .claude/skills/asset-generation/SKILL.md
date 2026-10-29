@@ -1,0 +1,109 @@
+---
+name: asset-generation
+description: Generate game sprites/sprite sheets with ChatGPT (chatgpt.com) through the Claude-in-Chrome MCP, then convert them into TypeScript pixel code so the game ships with zero image assets. Use when a game needs characters, creatures, props, or tiles that should look hand-drawn rather than procedurally drawn.
+---
+
+# Asset Generation Skill (ChatGPT → coded pixels)
+
+Goal: every sprite in the game is a 1:1 replica of a ChatGPT-generated sprite sheet,
+but stored as **code** (palette + indexed pixel strings in `.ts` files). No PNGs,
+no `/public` images, nothing loaded over the network. Source images are temporary
+and must never be committed.
+
+## Pipeline overview
+
+1. **Generate** a sheet in ChatGPT via Chrome MCP (Gmail/ChatGPT session already logged in).
+2. **Download** the image (lands in `~/Downloads`).
+3. **Convert** with `node scripts/sprite2code.mjs` → `src/game/sprites/<name>.ts`.
+4. **Verify** with `--preview` (look at the PNG with the Read tool) and in-game.
+5. **Register** the sprite in `src/game/sprites/index.ts`.
+6. **Delete** the downloaded source image.
+
+## 1. Generating in ChatGPT (Chrome MCP)
+
+- Load Chrome tools in ONE ToolSearch call:
+  `select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__find,mcp__claude-in-chrome__read_page,mcp__claude-in-chrome__javascript_tool`
+- `tabs_context_mcp` first, then open a NEW tab at `https://chatgpt.com/`.
+- Start a fresh chat per sheet (consistency within a sheet matters more than across sheets,
+  but reuse one chat for a whole character set if style drifts — say "same style as before").
+- Type the prompt into the composer, press Enter, then wait (image generation takes
+  30–120 s). Poll with screenshots every ~20 s; do not spam.
+
+### Prompt template (characters)
+
+```
+Pixel art game sprite sheet of <CHARACTER DESCRIPTION>, for a muted, gritty
+isometric survival RPG (Project-Zomboid-like mood, medieval-rural setting).
+Exactly 3 rows, 4 frames per row, evenly spaced on a strict grid:
+row 1 = walking toward the viewer (front view),
+row 2 = walking away from the viewer (back view),
+row 3 = walking to the right (side view).
+Full body, same size and proportions in every frame, feet aligned on the same baseline.
+Clean 1px dark outlines, limited palette, no anti-aliasing, no text, no labels,
+no grid lines, no shadows on the ground.
+Background: one flat solid pure magenta colour #FF00FF filling the whole image.
+```
+
+### Prompt template (animals / creatures)
+
+Same as above but: `Exactly 1 row of 4 frames: walking to the right (side view).`
+(Use 2 rows if a front view is wanted.)
+
+### Prompt template (props / objects)
+
+```
+Pixel art isometric game props sheet, muted gritty medieval survival style:
+<LIST OF PROPS, e.g. oak tree, pine tree, berry bush, rock, wooden crate, barrel>.
+Each prop separate with generous spacing, arranged in a single row in that order,
+isometric 2:1 perspective, clean dark outlines, no text, no labels,
+flat solid pure magenta #FF00FF background.
+```
+
+### Downloading
+
+- Hover the generated image → click its download button (or open the image and use the
+  download icon). The file goes to `~/Downloads` (usually `ChatGPT Image <date>.png`).
+- Find it: `ls -t ~/Downloads | head -3`.
+- Fallback if download fails: in the page, use `javascript_tool` to `fetch(img.src)` and
+  POST nothing — instead draw the `<img>` onto a canvas and read back a downscaled
+  copy; but prefer the real download (full resolution gives better conversion).
+
+## 2. Converting to code
+
+```
+node scripts/sprite2code.mjs ~/Downloads/<file>.png \
+  --name bandit --layout "front:4,back:4,side:4" --h 48 --colors 32 \
+  --preview "$SCRATCH/bandit_preview.png"
+```
+
+- Humans/NPCs: `--h 48`. Wolves/deer/boar: `--h 30..36`. Boss: `--h 72`. Trees: `--h 110`.
+- The script keys out the background (border flood fill), finds sprite blobs, groups them
+  into rows by y, sorts by x, scales ALL frames with one shared scale (so walk cycles stay
+  aligned, bottom-centre anchored), quantizes with median cut, writes indexed strings.
+- Read its stderr: `detected rows: 4 | 4 | 4`. If counts mismatch:
+  - blobs split (weapon detached) → raise `--gap 16`
+  - stray specks counted → raise `--minarea 0.15`
+  - rows merged/out of order → pick rows explicitly: `--layout "front:4@0,side:4@2"`
+  - background not removed → raise `--tol 90`
+  - props: one sheet → run once per prop with `--single` after cropping, or use
+    layout `"oak:1@0"` style with each prop in its own detected row/column.
+- Always open the `--preview` PNG with the Read tool and eyeball it before using.
+  If ChatGPT drew a bad sheet (frames uneven, wrong count), regenerate rather than hack.
+
+## 3. Using sprites in the game
+
+- `src/game/sprites/types.ts` — `CodedSprite` type + alphabet.
+- `src/game/sprites/index.ts` — registry; import each generated file and add to `SPRITES`.
+- At boot `registerCodedSprites(scene)` paints each frame into a canvas texture named
+  `<name>_<anim>_<i>` (e.g. `bandit_side_2`). Game code falls back to procedural textures
+  when a sprite is missing, so the game always runs.
+- Side views face right; flip with `setFlipX(true)` for left.
+
+## 4. Rules
+
+- Never commit downloaded images; delete them from `~/Downloads` after conversion
+  (only the ones you created). Never put them in `public/`.
+- Keep a consistent style line across all prompts so the cast matches.
+- One Chrome agent at a time — parallel subagents must not share the browser.
+- If ChatGPT is not logged in, or hits a usage limit, stop and report; keep procedural
+  fallbacks so the game still works.
