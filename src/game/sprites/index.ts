@@ -16,6 +16,8 @@ import inquisitor from './inquisitor';
 import bellkeeper from './bellkeeper';
 import elder from './elder';
 import merchant from './merchant';
+import warden from './warden';
+import herbalist from './herbalist';
 // --- generated sprite imports end ---
 
 export const SPRITES: CodedSprite[] = [
@@ -32,6 +34,8 @@ export const SPRITES: CodedSprite[] = [
   bellkeeper,
   elder,
   merchant,
+  warden,
+  herbalist,
   // --- generated sprite list end ---
 ];
 
