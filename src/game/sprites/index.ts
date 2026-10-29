@@ -20,6 +20,8 @@ import warden from './warden';
 import herbalist from './herbalist';
 import smith from './smith';
 import hunter from './hunter';
+import boss_choir from './boss_choir';
+import boss_bride from './boss_bride';
 // --- generated sprite imports end ---
 
 export const SPRITES: CodedSprite[] = [
@@ -40,6 +42,8 @@ export const SPRITES: CodedSprite[] = [
   herbalist,
   smith,
   hunter,
+  boss_choir,
+  boss_bride,
   // --- generated sprite list end ---
 ];
 

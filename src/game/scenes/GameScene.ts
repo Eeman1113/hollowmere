@@ -886,7 +886,7 @@ export class GameScene extends Phaser.Scene {
     const def = BOSSES[id];
     if (!def || this.P.flags[`boss_${id}`]) return;
     const baked = this.bakeFor(def.look, ENEMY_CLIPS, def.scale ?? 1, 1.9);
-    const a = new Actor(this, { key: `b_${id}`, baked, x, y, faction: 'enemy', hp: def.hp, scale: def.scale ?? 1, boss: def, name: def.name });
+    const a = new Actor(this, { key: baked.key, baked, x, y, faction: 'enemy', hp: def.hp, scale: def.scale ?? 1, boss: def, name: def.name });
     a.dmg = def.dmg; a.runes = def.runes; a.arena = { x, y, r: def.arena };
     a.aggroed = true;
     this.actors.push(a);
