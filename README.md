@@ -1,9 +1,9 @@
 # Hollowmere
 
-An infinite, seed-generated isometric soulslike. Every sprite, tile, building,
-animation and sound effect in the game is **produced in code at runtime** — the
-repository contains no image or audio files, and the playable build is under a
-megabyte.
+An infinite, seed-generated isometric soulslike. **Nothing in this repository is
+an image file.** Characters are ChatGPT-drawn sprite sheets converted to
+indexed pixel data in `.ts` files; the world, buildings, items and every sound
+are generated in code at runtime. The playable build is under two megabytes.
 
 > *The lamps are going out, one valley-arm at a time.*
 
@@ -118,13 +118,38 @@ into the world.
 
 This is the part worth reading if you are extending the project.
 
-### Characters are a 3D rig, not a sprite sheet
+### Characters are drawn sheets, expanded to eight facings
 
-Hand-drawn or AI-generated walk cycles cannot stay coherent across eight
-isometric facings — you get sliding feet, legs that do not move, and characters
-that moonwalk because the drawn facing and the travel direction disagree.
+Every character — the player, twelve enemies, seven townsfolk and four bosses —
+is a sprite sheet generated in ChatGPT and converted to code by
+`scripts/sprite2code.mjs`, following `.claude/skills/asset-generation/SKILL.md`.
+A sheet is three or four rows of four frames: walking toward the viewer, away,
+to the right, and (for anything that fights) an attack row.
 
-So characters are not drawn. They are **posed**.
+`art/codedbake.ts` expands those three views across the eight isometric facings
+the game uses and hands the result to the same `Baked` atlas the engine already
+drives. Side views are drawn facing right, so the three leftward facings reuse
+them mirrored. The facing itself is derived from the movement vector, never
+from the animation state, so what a character faces and where it travels cannot
+disagree — which is what stops the sliding and the moonwalking that a naive
+sheet-swap produces.
+
+`scripts/grab-sheet.sh` wraps the convert-and-register step. Two things in it
+are load-bearing: it cuts sheets on the even grid (`--grid`) rather than by blob
+detection, because a halberd or scythe reaching out of its frame merges blobs
+across cells and silently shifts every frame after it; and it only touches a PNG
+downloaded in the last five minutes, parking the source in the scratchpad rather
+than deleting it, so a bad conversion can be retried with different flags.
+
+### The rig is still there, as the fallback
+
+Anything without a drawn sheet falls back to a procedural skeleton that poses in
+3D and projects isometrically. It drives the wildlife — deer, stag, wolf, boar
+and the hounds — on a quadruped rig with a diagonal-pair gait, because a
+one-row side-view sheet would lose the eight directions those animals need.
+The rig also still powers the paper-doll portrait and the item icons.
+
+It works like this:
 
 1. `art/rig.ts` — a skeleton with forward kinematics. A pose is a set of joint
    angles (hip swing, knee bend, shoulder, elbow, torso lean and twist), solved
@@ -143,9 +168,7 @@ So characters are not drawn. They are **posed**.
    Armour, helms, capes, weapons and shields are drawn in the same pass from
    the `Look` description.
 5. `art/bake.ts` — bakes every clip × direction × frame into **one** canvas
-   atlas per appearance, so an actor costs a single texture bind. Changing gear
-   re-bakes the player's atlas; enemies bake once per type and mirror three of
-   their eight facings.
+   atlas per appearance, so an actor costs a single texture bind.
 
 `art/beast.ts` is the same idea for quadrupeds, with a diagonal-pair gait and
 front legs that bend the opposite way to the hind legs.
@@ -153,10 +176,9 @@ front legs that bend the opposite way to the hind legs.
 Item icons come from the same painters: a weapon's inventory icon is drawn by
 the exact routine that draws it in the character's hand, so the icon is
 literally the thing you will be holding. Armour icons are built from the same
-`ArmorVis` description the sprite baker reads, which means a new set needs one
-definition and gets a character sprite, a paper-doll portrait and an icon.
+`ArmorVis` description the rig reads.
 
-### Everything else is drawn the same way
+### The world is drawn in code
 
 `art/raster.ts` is a small software rasteriser (tapered capsules, convex
 polygons, ellipses, outline and top-light passes). `art/propdraw.ts` paints all
@@ -170,6 +192,9 @@ WebAudio oscillators and filtered noise.
 The rasteriser is deliberately free of Phaser imports so it can run under Node:
 
 ```bash
+# convert a freshly downloaded ChatGPT sheet and register it
+./scripts/grab-sheet.sh <name> "front:4,back:4,side:4,attack:4" <height>
+
 npm run preview:rig   -- /tmp/rig.png walk,attack1 player 4 0,2,4
 npm run preview:beast -- /tmp/deer.png walk deer
 npm run preview:gear  -- /tmp/gear.png idle 2      # every armour set, worn
@@ -186,6 +211,7 @@ iterate on a pose or a building without a browser in the loop.
 ```
 src/game/
   art/        rasteriser, rig, animation clips, painters, bakers, palette
+  sprites/    ChatGPT-derived sheets as indexed pixel data (generated)
   world/      tile and prop tables, biomes, chunk generator, structures, streaming
   content/    items, enemies, bosses, shops, contracts, lore, chapter spine
   scenes/     title, game, UI

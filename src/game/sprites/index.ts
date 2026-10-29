@@ -22,6 +22,8 @@ import smith from './smith';
 import hunter from './hunter';
 import boss_choir from './boss_choir';
 import boss_bride from './boss_bride';
+import boss_hollow from './boss_hollow';
+import boss_smith from './boss_smith';
 // --- generated sprite imports end ---
 
 export const SPRITES: CodedSprite[] = [
@@ -44,6 +46,8 @@ export const SPRITES: CodedSprite[] = [
   hunter,
   boss_choir,
   boss_bride,
+  boss_hollow,
+  boss_smith,
   // --- generated sprite list end ---
 ];
 
