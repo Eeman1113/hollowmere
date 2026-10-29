@@ -45,3 +45,6 @@ playtest-out/
 !src/**/*.png
 
 out/
+
+# packaged builds
+/dist/

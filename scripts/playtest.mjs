@@ -17,61 +17,102 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage();
 const errors = [];
 page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errors.push(`[${m.type()}] ${m.text()}`); });
-page.on('pageerror', e => errors.push(`[pageerror] ${e.message}\n${e.stack ?? ''}`));
+page.on('pageerror', e => errors.push(`[pageerror] ${e.message}\n${(e.stack ?? '').split('\n').slice(0, 4).join('\n')}`));
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const shot = async name => { const pk = await page.evaluate(() => window.__game?.scene.getScene('ui')?.panelKind ?? null).catch(() => null); await page.screenshot({ path: `${out}/${name}.png` }); console.log('shot', name, 'panel:', pk); };
+const shot = async name => { await page.screenshot({ path: `${out}/${name}.png` }); console.log('shot', name); };
 const hold = async (key, ms) => { await page.keyboard.down(key); await sleep(ms); await page.keyboard.up(key); };
 const game = fn => page.evaluate(fn);
 
 await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
 await page.evaluate(() => localStorage.clear());
 await page.reload({ waitUntil: 'networkidle0' });
-await sleep(2500);
+await sleep(3000);
 await shot('01-title');
 await page.keyboard.press('Enter');
-await sleep(2500);
+await sleep(4000);
 await shot('02-start');
+
+// walk around the hub
 await hold('s', 900);
 await hold('d', 700);
 await sleep(300);
 await shot('03-moved');
-await page.keyboard.press('i');
-await sleep(500);
-await shot('04-inventory');
-await page.keyboard.press('i');
-await page.keyboard.press('c');
-await sleep(400);
-await shot('05-craft');
+
+// panels
+for (const [k, name] of [['i', '04-inventory'], ['c', '05-character'], ['j', '06-journal'], ['m', '07-map'], ['h', '08-help']]) {
+  await page.keyboard.press('Escape');
+  await sleep(150);
+  await page.keyboard.press(k);
+  await sleep(500);
+  await shot(name);
+}
 await page.keyboard.press('Escape');
-await page.keyboard.press('m');
-await sleep(400);
-await shot('06-map');
-await page.keyboard.press('Escape');
-// exit the house and walk to the plaza
-await hold('s', 1600);
-await hold('d', 2200);
-await shot('07-village');
-// night
-await game(() => { const g = window.__game.scene.getScene('game'); g.minutes += (23 - g.hour) * 60; });
-await sleep(800);
-await shot('08-night');
-// teleport near forest to see creatures, then fight
-await game(() => { const g = window.__game.scene.getScene('game'); g.player.x = g.P.x = 50.5; g.player.y = g.P.y = 75.5; g.minutes += 12 * 60; g.spawnMob('wolf', 52, 76); g.spawnMob('boar', 48, 77); g.spawnMob('deer', 53, 73); });
-await sleep(1200);
-await shot('09-creatures');
-for (let i = 0; i < 6; i++) { await page.mouse.click(760, 470); await sleep(350); }
+await sleep(300);
+
+// combat: spawn a few enemies next to the player and fight
+await game(() => {
+  const g = window.__game.scene.getScene('game');
+  for (const [id, dx, dy] of [['hollow', 2, 0], ['hollow_axe', -2, 1], ['fenhound', 0, 2]]) {
+    g.spawnEnemy(id, g.player.x + dx, g.player.y + dy, 1);
+  }
+});
+await sleep(1600);
+await shot('09-enemies');
+for (let i = 0; i < 8; i++) { await page.mouse.click(760, 450); await sleep(260); }
 await shot('10-fight');
-// bandit camp + boss
-await game(() => { const g = window.__game.scene.getScene('game'); g.player.x = g.P.x = 76.5; g.player.y = g.P.y = 22.5; g.P.hp = g.P.maxHp = 999; });
-await sleep(1500);
-await shot('11-bandits');
-await game(() => { const g = window.__game.scene.getScene('game'); g.player.x = g.P.x = 18.5; g.player.y = g.P.y = 28.5; });
+await page.keyboard.press(' ');
+await sleep(200);
+await shot('11-roll');
+
+// night
+await game(() => { const g = window.__game.scene.getScene('game'); g.minutes = 23 * 60; });
+await sleep(900);
+await shot('12-night');
+
+// travel to the cathedral story site
+await game(() => {
+  const g = window.__game.scene.getScene('game');
+  const s = g.gen.sites.find(s => s.id === 'choir');
+  g.player.x = g.P.x = s.x + 0.5; g.player.y = g.P.y = s.y + 14;
+  g.minutes = 10 * 60;
+  g.stream.update(g.P.x, g.P.y);
+});
+await sleep(3000);
+await shot('13-cathedral');
+await game(() => {
+  const g = window.__game.scene.getScene('game');
+  const s = g.gen.sites.find(s => s.id === 'choir');
+  g.player.x = g.P.x = s.x + 0.5; g.player.y = g.P.y = s.y + 4;
+});
 await sleep(2500);
-await shot('12-chapel');
-const state = await game(() => { const g = window.__game.scene.getScene('game'); return { hp: g.P.hp, mobs: g.mobs.length, fps: window.__game.loop.actualFps, inv: g.P.inv }; });
-console.log(JSON.stringify(state));
+await shot('14-boss');
+
+// armour change — proves gear renders on the character
+await game(() => {
+  const g = window.__game.scene.getScene('game');
+  for (const id of ['grave_helm', 'grave_plate', 'grave_arms', 'grave_legs', 'gravewarden_halberd', 'ossuary_tower']) {
+    g.P.inv.push({ id, qty: 1 });
+  }
+  g.P.equip.helm = 'grave_helm'; g.P.equip.chest = 'grave_plate';
+  g.P.equip.arms = 'grave_arms'; g.P.equip.legs = 'grave_legs';
+  g.P.equip.weapon = 'gravewarden_halberd'; g.P.equip.offhand = 'ossuary_tower';
+  g.refreshAppearance();
+});
+await sleep(1500);
+await shot('15-armoured');
+
+const state = await game(() => {
+  const g = window.__game.scene.getScene('game');
+  return {
+    hp: Math.round(g.player.hp), maxHp: g.player.maxHp, runes: g.P.runes,
+    actors: g.actors.length, props: g.stream.props.size, chunks: g.stream.live.size,
+    fps: Math.round(window.__game.loop.actualFps), biome: g.biome,
+    textures: window.__game.textures.list ? Object.keys(window.__game.textures.list).length : -1,
+  };
+});
+console.log('STATE', JSON.stringify(state));
 fs.writeFileSync(`${out}/errors.txt`, errors.join('\n'));
 console.log(`errors: ${errors.length}`);
-console.log(errors.slice(0, 15).join('\n'));
+console.log(errors.slice(0, 12).join('\n'));
 await browser.close();

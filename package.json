@@ -1,12 +1,19 @@
 {
-  "name": "rpg",
+  "name": "hollowmere",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "itch": "node scripts/package-itch.mjs",
+    "playtest": "node scripts/playtest.mjs",
+    "preview:rig": "node --no-warnings --import ./scripts/ts-reg.mjs scripts/preview-rig.mjs",
+    "preview:beast": "node --no-warnings --import ./scripts/ts-reg.mjs scripts/preview-beast.mjs",
+    "preview:props": "node --no-warnings --import ./scripts/ts-reg.mjs scripts/preview-props.mjs",
+    "preview:world": "node --no-warnings --import ./scripts/ts-reg.mjs scripts/preview-world.mjs",
+    "preview:gear": "node --no-warnings --import ./scripts/ts-reg.mjs scripts/preview-gear.mjs"
   },
   "dependencies": {
     "next": "16.4.3",
