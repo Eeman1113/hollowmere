@@ -13,6 +13,9 @@ import ghoul from './ghoul';
 import wraith from './wraith';
 import beastman from './beastman';
 import inquisitor from './inquisitor';
+import bellkeeper from './bellkeeper';
+import elder from './elder';
+import merchant from './merchant';
 // --- generated sprite imports end ---
 
 export const SPRITES: CodedSprite[] = [
@@ -26,6 +29,9 @@ export const SPRITES: CodedSprite[] = [
   wraith,
   beastman,
   inquisitor,
+  bellkeeper,
+  elder,
+  merchant,
   // --- generated sprite list end ---
 ];
 
