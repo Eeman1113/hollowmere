@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { TW, TH, toScreen, toWorld, depthOf, clamp, dist, mulberry32, randInt } from '../core';
-import { CONTAINERS, ITEMS, MOBS, NPCS, O, OBJ_NAMES, QUESTS, T, TALL, type MobDef, type NpcId, type Recipe, type Skill } from '../data';
+import { BLOCKING, CONTAINERS, ITEMS, MOBS, NPCS, O, OBJ_NAMES, QUESTS, T, TALL, type MobDef, type NpcId, type Recipe, type Skill } from '../data';
 import { World, W, H, VILLAGE, BANDIT_CAMP, CHAPEL, type Stack } from '../world';
 import {
   addItem, carryWeight, clearSave, countItem, decodeBytes, encodeBytes, loadGame, maxCarry, newPlayer, removeItem,
@@ -107,6 +107,23 @@ export class GameScene extends Phaser.Scene {
   rain = 0; rainTarget = 0; weatherT = 0;
   frameCounts = new Map<string, number>();
   selector!: Phaser.GameObjects.Image;
+  bobs: Phaser.GameObjects.Bob[] = [];
+  cullT = 0;
+  mapDirty = true;
+
+  /** Is any actor overlapping tile i? */
+  occupied(i: number) {
+    const x = (i % W) + 0.5, y = Math.floor(i / W) + 0.5;
+    return [this.player, ...this.mobs, ...this.npcs].some(a => a && Math.abs(a.x - x) < 0.8 && Math.abs(a.y - y) < 0.8);
+  }
+
+  /** Hide ground bobs and props outside the camera view (Phaser does not cull these). */
+  cull() {
+    const v = this.cameras.main.worldView;
+    const x0 = v.x - 140, x1 = v.right + 140, y0 = v.y - 60, y1 = v.bottom + 200;
+    for (const b of this.bobs) b.visible = b.x > x0 - 64 && b.x < x1 && b.y > y0 - 40 && b.y < y1;
+    for (const img of this.objSprites.values()) img.setVisible(img.x > x0 && img.x < x1 && img.y > y0 && img.y - img.height < y1);
+  }
 
   constructor() { super('game'); }
 
@@ -128,6 +145,8 @@ export class GameScene extends Phaser.Scene {
   create(data: { load?: boolean }) {
     this.mobs = []; this.npcs = []; this.objSprites.clear(); this.roofs = []; this.flames.clear(); this.lampGlows = []; this.faded.clear();
     this.dead = false; this.bossSpawned = false; this.sleeping = false;
+    this.banditRespawnAt = 0; this.chop.clear(); this.attackCd = 0; this.interactTarget = null;
+    this.rain = this.rainTarget = 0; this.weatherT = 30; this.promptT = 0; this.spawnT = 0; this.mapDirty = true;
     const save = data?.load ? loadGame() : null;
     const seed = save?.seed ?? 1337;
     this.world = new World(seed);
@@ -172,7 +191,6 @@ export class GameScene extends Phaser.Scene {
     this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => {
       cam.setZoom(clamp(cam.zoom * (dy > 0 ? 0.9 : 1.1), 1, 2.6));
     });
-    this.input.keyboard!.on('keydown-E', () => this.interact());
 
     this.scene.launch('ui', { game: this });
     this.ui = this.scene.get('ui') as UIScene;
@@ -199,16 +217,18 @@ export class GameScene extends Phaser.Scene {
   // ---------- world rendering ----------
   buildGround() {
     const bl = this.add.blitter(0, 0, 'ground').setDepth(-10);
+    this.bobs = [];
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const i = this.world.idx(x, y);
       const s = toScreen(x, y);
-      bl.create(s.x - TW / 2, s.y - 1, `${this.world.ground[i]}_${this.world.variant[i]}`);
+      this.bobs.push(bl.create(s.x - TW / 2, s.y - 1, `${this.world.ground[i]}_${this.world.variant[i]}`));
     }
     // a little shimmer on deep water edges
     this.time.addEvent({ delay: 1600, loop: true, callback: () => bl.setAlpha(1) });
   }
 
   refreshObj(i: number) {
+    this.mapDirty = true;
     const old = this.objSprites.get(i);
     if (old) { old.destroy(); this.objSprites.delete(i); this.faded.delete(old); }
     const fl = this.flames.get(i);
@@ -351,7 +371,7 @@ export class GameScene extends Phaser.Scene {
     const count = (id: string) => this.mobs.filter(m => m.def?.id === id && !m.dead).length;
     const night = this.night > 0.6;
     // despawn far wildlife
-    for (const m of this.mobs) {
+    for (const m of [...this.mobs]) {
       if (m.dead || m.def?.id === 'bandit' || m.def?.id === 'knight') continue;
       if (dist(m.x, m.y, this.P.x, this.P.y) > 42) this.removeMob(m);
       else if (m.def?.night && !night && this.night < 0.3) this.killMob(m, true);
@@ -367,9 +387,11 @@ export class GameScene extends Phaser.Scene {
     if (night) {
       if (count('wraith') < 6) { const p = this.findSpawn(12, 20, 16); if (p) this.spawnMob('wraith', p.x, p.y); }
     }
-    if (count('bandit') < 5 && this.minutes > this.banditRespawnAt && dist(this.P.x, this.P.y, BANDIT_CAMP.x, BANDIT_CAMP.y) > 28) {
+    const nb = count('bandit');
+    if (nb < 5 && this.banditRespawnAt === 0) this.banditRespawnAt = this.minutes + 1440;
+    if (nb < 5 && this.minutes > this.banditRespawnAt && dist(this.P.x, this.P.y, BANDIT_CAMP.x, BANDIT_CAMP.y) > 28) {
       this.spawnBandit();
-      if (count('bandit') >= 5) this.banditRespawnAt = this.minutes + 1440;
+      if (count('bandit') >= 5) this.banditRespawnAt = 0;
     }
     // chapel guardians
     const dChapel = dist(this.P.x, this.P.y, CHAPEL.x, CHAPEL.y);
@@ -395,13 +417,15 @@ export class GameScene extends Phaser.Scene {
   }
   moveActor(a: Actor, dx: number, dy: number) {
     let moved = false;
-    if (dx && !this.blocked(a.x + dx, a.y)) { a.x += dx; moved = true; }
-    if (dy && !this.blocked(a.x, a.y + dy)) { a.y += dy; moved = true; }
+    const stuck = this.blocked(a.x, a.y);
+    if (dx && (stuck || !this.blocked(a.x + dx, a.y))) { a.x += dx; moved = true; }
+    if (dy && (stuck || !this.blocked(a.x, a.y + dy))) { a.y += dy; moved = true; }
     return moved;
   }
 
   update(_t: number, dtMs: number) {
     const dt = Math.min(dtMs, 50) / 1000;
+    if (this.ui?.pausesGame()) return;
     if (!this.dead && !this.sleeping) {
       this.advanceTime(dt * MIN_PER_SEC, false);
       this.updatePlayer(dt);
@@ -410,6 +434,8 @@ export class GameScene extends Phaser.Scene {
     this.updateNpcs(dt);
     this.spawnT -= dt;
     if (this.spawnT <= 0) { this.spawnT = 1.5; this.manageSpawns(); }
+    this.cullT -= dt;
+    if (this.cullT <= 0) { this.cullT = 0.1; this.cull(); }
     this.fadeT -= dt;
     if (this.fadeT <= 0) { this.fadeT = 0.08; this.updateOcclusion(); }
     this.promptT -= dt;
@@ -449,6 +475,7 @@ export class GameScene extends Phaser.Scene {
         this.world.regrow = this.world.regrow.filter(r => r.at > this.minutes);
         for (const r of due) {
           const cur = this.world.obj[r.i] as O;
+          if (BLOCKING.has(r.o) && this.occupied(r.i)) { this.world.regrow.push({ ...r, at: this.minutes + 60 }); continue; }
           if (cur === O.NONE || cur === O.BUSH_EMPTY || cur === O.STUMP) { this.world.obj[r.i] = r.o; this.refreshObj(r.i); }
         }
       }
@@ -485,7 +512,7 @@ export class GameScene extends Phaser.Scene {
     P.stamina = clamp(P.stamina, 0, maxSt);
     P.x = a.x; P.y = a.y;
     this.attackCd -= dt * 1000;
-    if ((Phaser.Input.Keyboard.JustDown(k.SPACE) || Phaser.Input.Keyboard.JustDown(k.F)) && !this.ui.blocksMovement()) this.attack(this.facing.x, this.facing.y);
+    if ((Phaser.Input.Keyboard.JustDown(k.SPACE) || Phaser.Input.Keyboard.JustDown(k.F)) && !this.ui.blocksWorldClick()) this.attack(this.facing.x, this.facing.y);
     if (a.hurtT > 0) { a.hurtT -= dt; a.sprite.setTint(0xff8080); if (a.hurtT <= 0) a.sprite.clearTint(); }
     a.sync();
   }
@@ -821,7 +848,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   interact() {
-    if (this.dead || this.sleeping || this.ui.blocksMovement()) return;
+    if (this.dead || this.sleeping || this.ui.blocksWorldClick()) return;
     const t = this.interactTarget;
     if (!t) return;
     const P = this.P;
@@ -909,7 +936,7 @@ export class GameScene extends Phaser.Scene {
     this.sleeping = true;
     this.ui.fadeSleep(() => {
       let hours = 0;
-      while (P.fatigue > 0 && hours < 10) { this.advanceTime(60, true); hours++; }
+      while (P.fatigue > 0 && hours < 10 && !this.dead) { this.advanceTime(60, true); hours++; }
       for (const m of [...this.mobs]) if (m.def?.night && this.night < 0.3) this.killMob(m, true);
       this.ui.log(`You slept for ${hours} hours.`, '#e8d8a8');
       this.save(true);
@@ -981,7 +1008,7 @@ export class GameScene extends Phaser.Scene {
     if (r.out === 'campfire') {
       const tx = Math.floor(P.x + this.facing.x * 1.2), ty = Math.floor(P.y + this.facing.y * 1.2);
       const g = this.world.g(tx, ty);
-      if (!this.world.walkable(tx, ty) || this.world.o(tx, ty) !== O.NONE || g === T.FLOOR || (tx === Math.floor(P.x) && ty === Math.floor(P.y))) { this.ui.log('No room for a campfire there. Face an open patch of ground.', '#e8a878'); return; }
+      if (!this.world.walkable(tx, ty) || this.world.o(tx, ty) !== O.NONE || g === T.FLOOR || this.occupied(this.world.idx(tx, ty))) { this.ui.log('No room for a campfire there. Face an open patch of ground.', '#e8a878'); return; }
       for (const [id, q] of Object.entries(r.needs)) removeItem(P, id, q);
       this.world.set(tx, ty, O.CAMPFIRE); this.refreshObj(this.world.idx(tx, ty));
       this.ui.log('You build a campfire.', '#e8c898');

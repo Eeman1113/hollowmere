@@ -77,8 +77,9 @@ export class TitleScene extends Phaser.Scene {
     // drifting embers
     const embers = this.add.particles(0, 0, 'px', { x: { min: 0, max: w }, y: h, lifespan: 6000, speedY: { min: -40, max: -15 }, speedX: { min: -10, max: 10 }, scale: { start: 1.5, end: 0 }, alpha: { start: 0.8, end: 0 }, tint: [0xffa040, 0x60ffe0], frequency: 120 });
     this.input.keyboard!.once('keydown-ENTER', () => this.scene.start('game', { load: hasSave() }));
-    this.scale.on('resize', () => this.scene.restart());
-    this.events.once('shutdown', () => this.scale.removeAllListeners('resize'));
+    const onResize = () => this.scene.restart();
+    this.scale.on('resize', onResize);
+    this.events.once('shutdown', () => this.scale.off('resize', onResize));
     void [title, sub, tag, help, embers, trees];
   }
 }

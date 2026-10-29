@@ -20,7 +20,7 @@ page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') er
 page.on('pageerror', e => errors.push(`[pageerror] ${e.message}\n${e.stack ?? ''}`));
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const shot = async name => { await page.screenshot({ path: `${out}/${name}.png` }); console.log('shot', name); };
+const shot = async name => { const pk = await page.evaluate(() => window.__game?.scene.getScene('ui')?.panelKind ?? null).catch(() => null); await page.screenshot({ path: `${out}/${name}.png` }); console.log('shot', name, 'panel:', pk); };
 const hold = async (key, ms) => { await page.keyboard.down(key); await sleep(ms); await page.keyboard.up(key); };
 const game = fn => page.evaluate(fn);
 

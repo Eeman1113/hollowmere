@@ -80,24 +80,31 @@ export class UIScene extends Phaser.Scene {
     this.fadeRect = this.add.rectangle(0, 0, w, h, 0x000000, 0).setOrigin(0).setDepth(95);
     this.layout();
     this.scale.on('resize', this.onResize, this);
-    this.events.once('shutdown', () => this.scale.off('resize', this.onResize, this));
+    this.events.once('shutdown', () => { this.scale.off('resize', this.onResize, this); this.lightPool.forEach(l => l.destroy()); this.lightPool = []; });
 
-    const kb = this.input.keyboard!;
-    kb.addCapture('TAB');
-    kb.on('keydown-I', () => this.toggle('inv'));
-    kb.on('keydown-TAB', () => this.toggle('inv'));
-    kb.on('keydown-C', () => this.toggle('craft'));
-    kb.on('keydown-J', () => this.toggle('quests'));
-    kb.on('keydown-M', () => this.toggle('map'));
-    kb.on('keydown-H', () => this.toggle('help'));
-    kb.on('keydown-ESC', () => { if (this.panelKind === 'end') return; if (this.panel) this.close(); else this.open('pause'); });
-    kb.on('keydown-R', () => { if (this.panelKind === 'loot') { this.g.takeFromContainer(this.lootIdx, 0, true); this.refresh(); } });
-    kb.on('keydown', (e: KeyboardEvent) => {
+    // Hotkeys use a DOM listener: Phaser's queued key events can double-fire when
+    // several keys arrive within one frame, which made Esc close and reopen panels.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat || !this.g.P) return;
+      const k = e.key.toLowerCase();
+      if (k === 'tab') e.preventDefault();
       if (this.panelKind === 'dialog' && this.dialogNode) {
         const n = Number(e.key);
-        if (n >= 1 && n <= this.dialogNode.options.length) this.chooseOption(n - 1);
+        if (n >= 1 && n <= this.dialogNode.options.length) { this.chooseOption(n - 1); return; }
       }
-    });
+      switch (k) {
+        case 'i': case 'tab': this.toggle('inv'); break;
+        case 'c': this.toggle('craft'); break;
+        case 'j': this.toggle('quests'); break;
+        case 'm': this.toggle('map'); break;
+        case 'h': this.toggle('help'); break;
+        case 'escape': if (this.panelKind === 'end') return; if (this.panel) this.close(); else if (!this.g.dead && !this.g.sleeping) this.open('pause'); break;
+        case 'r': if (this.panelKind === 'loot') { this.g.takeFromContainer(this.lootIdx, 0, true); this.refresh(); } break;
+        case 'e': this.g.interact(); break;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    this.events.once('shutdown', () => window.removeEventListener('keydown', onKey));
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => { if (this.tooltip.visible) this.tooltip.setPosition(Math.min(p.x + 16, this.scale.width - this.tooltip.width - 4), Math.min(p.y + 12, this.scale.height - this.tooltip.height - 4)); });
   }
 
@@ -143,6 +150,7 @@ export class UIScene extends Phaser.Scene {
   hurtFlash() { this.hurt.setFillStyle(0xa00000, 0.28); this.tweens.add({ targets: this.hurt, fillAlpha: 0, duration: 350 }); }
   blocksMovement() { return this.panelKind === 'dialog' || this.panelKind === 'shop' || this.panelKind === 'pause' || this.panelKind === 'end' || this.panelKind === 'help'; }
   blocksWorldClick() { return !!this.panel; }
+  pausesGame() { return this.panelKind === 'pause' || this.panelKind === 'help'; }
   openLoot(i: number) { this.lootIdx = i; this.open('loot'); }
   openDialog(a: Actor) { this.dialogNpc = a; this.dialogNode = dialogFor(this.g, a.npc!); sfx.click(); this.open('dialog'); }
   openCraft() { this.open('craft'); }
@@ -256,6 +264,7 @@ export class UIScene extends Phaser.Scene {
     const key = m.map(x => x.join()).join('|');
     if (key === this.moodleKey) return;
     this.moodleKey = key;
+    this.tweens.killTweensOf(this.moodleC.list);
     this.moodleC.removeAll(true);
     const cols = [0x5a9a4a, 0xc8b040, 0xd87830, 0xc83030];
     m.forEach(([name, sev], i) => {
@@ -310,6 +319,7 @@ export class UIScene extends Phaser.Scene {
       img.data.set([col[0], col[1], col[2], 255], i * 4);
     }
     c.putImageData(img, 0, 0);
+    this.g.mapDirty = false;
     tex.refresh();
     return key;
   }
@@ -326,7 +336,7 @@ export class UIScene extends Phaser.Scene {
     sq.add(rot);
     this.mini.add([bg, sq]);
     (this.mini as unknown as { rot: Phaser.GameObjects.Container }).rot = rot;
-    this.time.addEvent({ delay: 5000, loop: true, callback: () => this.mapTexture() });
+    this.time.addEvent({ delay: 5000, loop: true, callback: () => { if (this.g.mapDirty) this.mapTexture(); } });
     this.mini.setScale(0.8);
   }
   updateMiniDot() {
@@ -339,7 +349,7 @@ export class UIScene extends Phaser.Scene {
 
   // ---------- panels ----------
   toggle(k: PanelKind) {
-    if (this.panelKind === 'end' || this.panelKind === 'dialog' || this.g.dead) return;
+    if (this.panelKind === 'end' || this.panelKind === 'dialog' || this.panelKind === 'shop' || this.g.dead || this.g.sleeping) return;
     if (this.panelKind === k) this.close(); else this.open(k);
   }
   open(k: PanelKind) {
