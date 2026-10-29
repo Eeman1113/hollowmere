@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hollowmere
 
-## Getting Started
+An isometric survival RPG in the spirit of Project Zomboid — but with no zombies. A blight called
+**the Hollow** has crept into a quiet valley: wolves have gone mad, bandits raid the roads and
+wraiths walk at night. Survive, level up, help the villagers and destroy the Hollow Knight.
 
-First, run the development server:
+Built with **Phaser 4** + **Next.js 16** (App Router). The game has **no image or audio files**:
+- Characters and creatures are generated with ChatGPT, then converted into palette-indexed
+  pixel strings in TypeScript (`src/game/sprites/*.ts`) by `scripts/sprite2code.mjs`.
+- The terrain, props, icons and lighting are drawn in code (`src/game/textures.ts`).
+- Sound effects come from a small WebAudio synth (`src/game/sfx.ts`).
+
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev     # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Controls
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Key | Action |
+| --- | --- |
+| WASD / arrows | Move (Shift to sprint) |
+| Left click / Space | Attack toward cursor / facing |
+| E | Interact — talk, loot, chop, gather, drink, sleep, cook |
+| I / Tab | Inventory & character sheet |
+| C | Crafting |
+| J | Quest journal |
+| M | Map |
+| Mouse wheel | Zoom |
+| Esc | Menu (save, sound, quit) |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Features
 
-## Learn More
+- A 100×100 procedurally generated valley: village, farms, lakes, forests, a bandit camp, a ruined chapel.
+- Zomboid-style survival: hunger, thirst, fatigue, bleeding, carry weight, and moodles.
+- Day/night cycle with real-time lighting (lanterns, lamps, campfires), plus rain.
+- See-through walls and roofs that lift off when you walk inside a house.
+- Melee combat with weapon reach and cooldowns, crits, knockback, and pack aggro.
+- Creatures: wolves, boars, deer, bandits, night wraiths, and a boss.
+- Five quests from five NPCs, a merchant, ten crafting recipes, four skills, and levelling.
+- Looting containers, chopping trees, foraging berries and herbs, regrowth over time.
+- Autosave to localStorage, plus death and victory screens.
 
-To learn more about Next.js, take a look at the following resources:
+## Tooling
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `scripts/sprite2code.mjs` turns a sprite sheet image into coded pixels (see `.claude/skills/asset-generation/SKILL.md`).
+- `scripts/playtest.mjs` plays the game headlessly in Chrome and saves screenshots plus console errors.
