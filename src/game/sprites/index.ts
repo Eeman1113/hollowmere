@@ -33,6 +33,8 @@ import deer from './deer';
 import boar from './boar';
 import fenhound from './fenhound';
 import player_lantern from './player_lantern';
+import hollow_axe from './hollow_axe';
+import redhand_bow from './redhand_bow';
 // --- generated sprite imports end ---
 
 export const SPRITES: CodedSprite[] = [
@@ -66,6 +68,8 @@ export const SPRITES: CodedSprite[] = [
   boar,
   fenhound,
   player_lantern,
+  hollow_axe,
+  redhand_bow,
   // --- generated sprite list end ---
 ];
 
