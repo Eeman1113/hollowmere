@@ -79,7 +79,21 @@ export interface CodedSpec {
 
 export function bakeCoded(scene: Phaser.Scene, spec: CodedSpec): Baked {
   const s = spec.sprite;
-  const clips = { ...DEFAULT_CLIPS, ...(spec.clips ?? {}) };
+  const clips: Partial<Record<ClipName, ClipMap>> = { ...DEFAULT_CLIPS };
+  // A sheet that drew a dedicated attack row gets to use it. The row is a side
+  // view, which is what every facing uses here — the same compromise every
+  // three-view sheet makes, and far better than reading a swing as a footstep.
+  const atk = s.frames.attack;
+  if (atk?.length) {
+    const n = atk.length;
+    clips.attack1 = { seq: Array.from({ length: n }, (_, i) => i), fps: 11, loop: false, row: 'attack' };
+    clips.attack2 = { seq: Array.from({ length: n }, (_, i) => n - 1 - i), fps: 11, loop: false, row: 'attack' };
+    clips.heavy = { seq: Array.from({ length: n }, (_, i) => i), fps: 7, loop: false, row: 'attack' };
+  }
+  if (s.frames.death?.length) {
+    clips.death = { seq: s.frames.death.map((_, i) => i), fps: 8, loop: false, row: 'death' };
+  }
+  Object.assign(clips, spec.clips ?? {});
   const frames: { name: string; buf: Px }[] = [];
   const info: Record<string, ClipInfo> = {};
   // decode each (view, frame, flip) once, then reference it per clip
@@ -97,9 +111,10 @@ export function bakeCoded(scene: Phaser.Scene, spec: CodedSpec): Baked {
     info[cn] = { n: map.seq.length, fps: map.fps, loop: map.loop };
     for (let d = 0; d < 8; d++) {
       const { view, flip } = DIR_VIEW[d];
-      const row = map.row ?? view;
+      // an explicit row (attack, death) overrides the per-direction view
+      const row = map.row && s.frames[map.row] ? map.row : view;
       map.seq.forEach((idx, f) => {
-        frames.push({ name: frameName(cn, d, f), buf: get(s.frames[row] ? row : view, idx, flip) });
+        frames.push({ name: frameName(cn, d, f), buf: get(row, idx, flip) });
       });
     }
   }

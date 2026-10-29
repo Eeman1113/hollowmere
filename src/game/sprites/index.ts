@@ -5,11 +5,21 @@ import type { CodedSprite } from './types';
 
 // --- generated sprite imports start ---
 import player from './player';
+import hollow from './hollow';
+import gravewarden from './gravewarden';
+import choirman from './choirman';
+import redhand from './redhand';
+import ghoul from './ghoul';
 // --- generated sprite imports end ---
 
 export const SPRITES: CodedSprite[] = [
   // --- generated sprite list start ---
   player,
+  hollow,
+  gravewarden,
+  choirman,
+  redhand,
+  ghoul,
   // --- generated sprite list end ---
 ];
 

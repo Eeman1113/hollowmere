@@ -213,6 +213,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   bakeFor(lookName: string, clips = ENEMY_CLIPS, scale = 1, box = 1, rig: 'humanoid' | 'beast' = 'humanoid'): Baked {
+    // a drawn sheet always wins over the procedural rig
+    const sheet = spriteByName(lookName);
+    if (sheet) {
+      const ck = `coded_${lookName}`;
+      return getBaked(ck) ?? bakeCoded(this, { key: ck, sprite: sheet, scale });
+    }
     const key = `bake_${lookName}`;
     const got = getBaked(key);
     if (got) return got;
@@ -285,7 +291,7 @@ export class GameScene extends Phaser.Scene {
     if (!def) return null;
     const s = scaled(def, tier);
     const baked = this.bakeFor(def.look, ENEMY_CLIPS, 1, 1, def.rig ?? 'humanoid');
-    const a = new Actor(this, { key: `e_${id}`, baked, x, y, faction: 'enemy', hp: s.hp, scale: def.scale ?? 1, def, name: def.name });
+    const a = new Actor(this, { key: baked.key, baked, x, y, faction: 'enemy', hp: s.hp, scale: def.scale ?? 1, def, name: def.name });
     a.dmg = s.dmg; a.runes = s.runes; a.poise = a.poiseCur = s.poise;
     (a as Actor & { spawnKey?: string }).spawnKey = spawnKey;
     this.actors.push(a);
