@@ -17,6 +17,8 @@
 // --tol     background colour tolerance (RGB distance).
 // --minarea drop blobs smaller than this fraction of the largest blob (default 0.08).
 // --gap     merge blobs whose boxes are closer than this many source px (default 8).
+// --grid    CxR: cut sheet into an even grid (frames touching/overlapping).
+// --unmix   k: strip magenta tint from translucent parts (with --hue threshold).
 // --single  treat the whole opaque area as one sprite (props / single images).
 
 import sharp from 'sharp';
@@ -138,8 +140,7 @@ if (args.unmix && bg && bg[0] > 200 && bg[2] > 200 && bg[1] < 60) {
     const i = j * 4, r = data[i], g = data[i + 1], b = data[i + 2];
     const ex = Math.min(r, b) - g;
     if (ex <= hueT) continue;
-    const cut = (ex - hueT) * (1 - k);
-    data[i] = Math.max(0, r - cut); data[i + 2] = Math.max(0, b - cut);
+    data[i] = Math.round(g + (r - g) * k); data[i + 2] = Math.round(g + (b - g) * k);
   }
 }
 // light erosion of 1px halos: drop opaque pixels with <=2 opaque neighbours
@@ -210,6 +211,35 @@ for (const b of blobs) {
 }
 rows.sort((a, b) => a.cy - b.cy);
 rows.forEach(r => r.items.sort((a, b) => a.x0 - b.x0));
+// --grid CxR: ignore blob grouping; cut the sheet into an even C×R grid and take the
+// bbox of the significant connected components inside each cell (for sheets where
+// frames touch/overlap, e.g. long weapons).
+if (args.grid) {
+  const [gc, gr] = String(args.grid).split('x').map(Number);
+  rows.length = 0;
+  for (let r = 0; r < gr; r++) {
+    const items = [];
+    const cy0 = Math.floor(r * H / gr), cy1 = Math.floor((r + 1) * H / gr) - 1;
+    for (let c = 0; c < gc; c++) {
+      const cx0 = Math.floor(c * W / gc), cx1 = Math.floor((c + 1) * W / gc) - 1;
+      const areas = new Map();
+      for (let y = cy0; y <= cy1; y++) for (let x = cx0; x <= cx1; x++) {
+        const j = y * W + x; if (!opaque[j]) continue;
+        areas.set(label[j], (areas.get(label[j]) || 0) + 1);
+      }
+      if (!areas.size) continue;
+      const mx = Math.max(...areas.values());
+      const keep = new Set([...areas].filter(([, a]) => a >= mx * 0.05).map(([l]) => l));
+      const b = { x0: cx1, y0: cy1, x1: cx0, y1: cy0, area: 0 };
+      for (let y = cy0; y <= cy1; y++) for (let x = cx0; x <= cx1; x++) {
+        const j = y * W + x; if (!opaque[j] || !keep.has(label[j])) continue;
+        if (x < b.x0) b.x0 = x; if (x > b.x1) b.x1 = x; if (y < b.y0) b.y0 = y; if (y > b.y1) b.y1 = y; b.area++;
+      }
+      items.push(b);
+    }
+    rows.push({ cy: (cy0 + cy1) / 2, h: cy1 - cy0, items });
+  }
+}
 console.error(`[${name}] ${W}x${H}, bg=${bg ? bg.join(',') : 'alpha'}, detected rows: ${rows.map(r => r.items.length).join(' | ')}`);
 
 // layout → frames

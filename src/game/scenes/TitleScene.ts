@@ -13,8 +13,27 @@ export class BootScene extends Phaser.Scene {
     makeGroundAtlas(this);
     makeObjectTextures(this);
     makeItemIcons(this);
+    berryBushes(this);
     this.scene.start('title');
   }
+}
+
+function berryBushes(scene: Phaser.Scene) {
+  // The generated bush has no fruit: paint berries onto a copy so picked/unpicked bushes read differently.
+  if (!scene.textures.exists('bush_idle_0')) return;
+  const src = scene.textures.get('bush_idle_0').getSourceImage() as HTMLCanvasElement;
+  const tex = scene.textures.createCanvas('bush_berries', src.width, src.height);
+  if (!tex) return;
+  const c = tex.getContext();
+  c.drawImage(src, 0, 0);
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 16; i++) {
+    const x = Math.floor(src.width * (0.18 + rnd() * 0.64)), y = Math.floor(src.height * (0.15 + rnd() * 0.55));
+    c.fillStyle = '#5a0a14'; c.fillRect(x, y, 3, 3);
+    c.fillStyle = i % 2 ? '#c82838' : '#e84858'; c.fillRect(x, y, 2, 2);
+  }
+  tex.refresh();
 }
 
 export class TitleScene extends Phaser.Scene {

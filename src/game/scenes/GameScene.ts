@@ -17,7 +17,7 @@ const OBJ_TEX: Partial<Record<O, string>> = {
   [O.GRAVE]: 'grave', [O.ALTAR]: 'altar', [O.HERB]: 'herb', [O.CHEST]: 'chest',
 };
 /** Optional coded-sprite overrides for props (from the asset-generation pipeline). */
-const OBJ_SPRITE: Partial<Record<O, string>> = { [O.TREE]: 'tree_oak_idle_0', [O.PINE]: 'tree_pine_idle_0', [O.BUSH]: 'bush_idle_0', [O.ROCK]: 'rock_idle_0' };
+const OBJ_SPRITE: Partial<Record<O, string>> = { [O.TREE]: 'tree_oak_idle_0', [O.PINE]: 'tree_pine_idle_0', [O.BUSH]: 'bush_berries', [O.BUSH_EMPTY]: 'bush_idle_0', [O.ROCK]: 'rock_idle_0' };
 
 type Anim = 'front' | 'back' | 'side';
 

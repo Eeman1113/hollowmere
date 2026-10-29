@@ -4,10 +4,44 @@ import { ALPHABET, type CodedSprite } from './types';
 // Registry of sprites converted from ChatGPT-generated sheets (see
 // .claude/skills/asset-generation/SKILL.md). Add new imports here.
 // --- generated sprite imports start ---
+import player from './player';
+import bandit from './bandit';
+import elder from './elder';
+import captain from './captain';
+import merchant from './merchant';
+import hunter from './hunter';
+import herbalist from './herbalist';
+import villager from './villager';
+import wolf from './wolf';
+import boar from './boar';
+import deer from './deer';
+import wraith from './wraith';
+import knight from './knight';
+import tree_oak from './tree_oak';
+import tree_pine from './tree_pine';
+import bush from './bush';
+import rock from './rock';
 // --- generated sprite imports end ---
 
 export const SPRITES: CodedSprite[] = [
   // --- generated sprite list start ---
+  player,
+  bandit,
+  elder,
+  captain,
+  merchant,
+  hunter,
+  herbalist,
+  villager,
+  wolf,
+  boar,
+  deer,
+  wraith,
+  knight,
+  tree_oak,
+  tree_pine,
+  bush,
+  rock,
   // --- generated sprite list end ---
 ];
 
