@@ -120,8 +120,9 @@ This is the part worth reading if you are extending the project.
 
 ### Characters are drawn sheets, expanded to eight facings
 
-Every character — the player, twelve enemies, seven townsfolk and four bosses —
-is a sprite sheet generated in ChatGPT and converted to code by
+Every character in the game — the player in all six armour sets, eighteen
+enemies, seven townsfolk and four bosses, thirty-four sheets in all — is a
+sprite sheet generated in ChatGPT and converted to code by
 `scripts/sprite2code.mjs`, following `.claude/skills/asset-generation/SKILL.md`.
 A sheet is three or four rows of four frames: walking toward the viewer, away,
 to the right, and (for anything that fights) an attack row.
@@ -141,13 +142,24 @@ across cells and silently shifts every frame after it; and it only touches a PNG
 downloaded in the last five minutes, parking the source in the scratchpad rather
 than deleting it, so a bad conversion can be retried with different flags.
 
+### Two things that are not obvious
+
+**Idle poses are inferred.** A walk sheet contains no neutral frame, so naively
+using frame 0 for idle leaves every character standing permanently mid-stride
+with one leg forward. `codedbake` measures the horizontal spread of the feet in
+the bottom of each frame and takes the narrowest — legs together — as the
+standing pose, per row, so every facing gets its own.
+
+**The gait is driven by distance, not time.** A cycle running at a fixed fps
+cannot match the ground at every speed, and the mismatch reads as skating.
+Actors advance their walk cycle by how far they actually travelled this frame.
+
 ### The rig is still there, as the fallback
 
 Anything without a drawn sheet falls back to a procedural skeleton that poses in
-3D and projects isometrically. It drives the wildlife — deer, stag, wolf, boar
-and the hounds — on a quadruped rig with a diagonal-pair gait, because a
-one-row side-view sheet would lose the eight directions those animals need.
-The rig also still powers the paper-doll portrait and the item icons.
+3D and projects isometrically — humanoid or quadruped. Nothing uses it now, but
+it means a missing or broken sheet degrades instead of crashing, and the item
+icons are still drawn by its weapon and armour painters.
 
 It works like this:
 

@@ -37,6 +37,7 @@ import hollow_axe from './hollow_axe';
 import redhand_bow from './redhand_bow';
 import stag from './stag';
 import emberhound from './emberhound';
+import rotbeast from './rotbeast';
 // --- generated sprite imports end ---
 
 export const SPRITES: CodedSprite[] = [
@@ -74,6 +75,7 @@ export const SPRITES: CodedSprite[] = [
   redhand_bow,
   stag,
   emberhound,
+  rotbeast,
   // --- generated sprite list end ---
 ];
 
