@@ -28,6 +28,8 @@ import player_grave from './player_grave';
 import player_choir from './player_choir';
 import player_hunter from './player_hunter';
 import player_crown from './player_crown';
+import wolf from './wolf';
+import deer from './deer';
 // --- generated sprite imports end ---
 
 export const SPRITES: CodedSprite[] = [
@@ -56,6 +58,8 @@ export const SPRITES: CodedSprite[] = [
   player_choir,
   player_hunter,
   player_crown,
+  wolf,
+  deer,
   // --- generated sprite list end ---
 ];
 
