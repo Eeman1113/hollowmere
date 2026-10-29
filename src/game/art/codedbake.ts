@@ -28,15 +28,26 @@ export const DIR_VIEW: { view: string; flip: boolean }[] = [
  * How each animation clip is played from a walk sheet. `from` names the sheet
  * row set; `seq` indexes into that row's frames.
  */
-export interface ClipMap { seq: number[]; fps: number; loop: boolean; row?: string }
+export interface ClipMap {
+  seq: number[];
+  fps: number;
+  loop: boolean;
+  row?: string;
+  /**
+   * Use the row's standing frame instead of `seq`. A walk sheet has no neutral
+   * pose, so frame 0 is mid-stride — picking it for idle leaves the character
+   * permanently frozen with one leg forward.
+   */
+  neutral?: boolean;
+}
 
 export const DEFAULT_CLIPS: Partial<Record<ClipName, ClipMap>> = {
-  idle: { seq: [0], fps: 2, loop: true },
+  idle: { seq: [0], fps: 2, loop: true, neutral: true },
   walk: { seq: [0, 1, 2, 3], fps: 8, loop: true },
   run: { seq: [0, 1, 2, 3], fps: 13, loop: true },
-  block: { seq: [0], fps: 2, loop: true },
+  block: { seq: [0], fps: 2, loop: true, neutral: true },
   blockwalk: { seq: [0, 1, 2, 3], fps: 7, loop: true },
-  rest: { seq: [0], fps: 2, loop: true },
+  rest: { seq: [0], fps: 2, loop: true, neutral: true },
   cast: { seq: [0, 1], fps: 6, loop: false },
   // Without dedicated art, a swing is read as a fast partial step. Replaced by
   // a real attack row whenever the sheet provides one.
@@ -46,6 +57,30 @@ export const DEFAULT_CLIPS: Partial<Record<ClipName, ClipMap>> = {
   hurt: { seq: [0], fps: 6, loop: false },
   death: { seq: [0], fps: 4, loop: false },
 };
+
+/**
+ * The frame in a row whose feet are closest together — the best stand-in for a
+ * standing pose when the sheet only drew a walk cycle.
+ */
+function neutralIndex(s: CodedSprite, view: string) {
+  const rows = s.frames[view];
+  if (!rows?.length) return 0;
+  const y0 = Math.floor(s.h * 0.78);
+  let best = 0, bestSpread = Infinity;
+  rows.forEach((data, i) => {
+    let lo = s.w, hi = -1;
+    for (let y = y0; y < s.h; y++) {
+      for (let x = 0; x < s.w; x++) {
+        if (data[y * s.w + x] === '.') continue;
+        if (x < lo) lo = x;
+        if (x > hi) hi = x;
+      }
+    }
+    const spread = hi - lo;
+    if (spread >= 0 && spread < bestSpread) { bestSpread = spread; best = i; }
+  });
+  return best;
+}
 
 const hexToRgb = (h: string): [number, number, number] => {
   const n = parseInt(h.replace('#', ''), 16);
@@ -108,12 +143,13 @@ export function bakeCoded(scene: Phaser.Scene, spec: CodedSpec): Baked {
   };
 
   for (const [cn, map] of Object.entries(clips) as [ClipName, ClipMap][]) {
-    info[cn] = { n: map.seq.length, fps: map.fps, loop: map.loop };
+    info[cn] = { n: map.neutral ? 1 : map.seq.length, fps: map.fps, loop: map.loop };
     for (let d = 0; d < 8; d++) {
       const { view, flip } = DIR_VIEW[d];
       // an explicit row (attack, death) overrides the per-direction view
       const row = map.row && s.frames[map.row] ? map.row : view;
-      map.seq.forEach((idx, f) => {
+      const seq = map.neutral ? [neutralIndex(s, row)] : map.seq;
+      seq.forEach((idx, f) => {
         frames.push({ name: frameName(cn, d, f), buf: get(row, idx, flip) });
       });
     }

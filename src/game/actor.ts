@@ -142,13 +142,26 @@ export class Actor {
 
   advanceClip(dt: number, speedMul = 1) {
     const c = clipInfo(this.baked, this.baked.clips.has(this.clip) ? this.clip : 'idle');
-    this.clipT += dt * c.fps * speedMul;
-    if (this.clipT >= 1) {
-      const step = Math.floor(this.clipT);
-      this.clipT -= step;
-      this.frame += step;
-      if (!c.loop && this.frame >= c.n - 1) this.frame = c.n - 1;
-    }
+    this.step(dt * c.fps * speedMul, c.loop, c.n);
+  }
+
+  /**
+   * Drive the gait off distance travelled rather than wall-clock time. A walk
+   * cycle timed by a fixed fps will not match the ground at every speed, and
+   * the mismatch reads as skating.
+   */
+  advanceClipByDistance(dist: number, cycleTiles = 1.7) {
+    const c = clipInfo(this.baked, this.baked.clips.has(this.clip) ? this.clip : 'idle');
+    this.step((dist / Math.max(0.05, cycleTiles)) * c.n, c.loop, c.n);
+  }
+
+  private step(advance: number, loop: boolean, n: number) {
+    this.clipT += advance;
+    if (this.clipT < 1) return;
+    const s = Math.floor(this.clipT);
+    this.clipT -= s;
+    this.frame += s;
+    if (!loop && this.frame >= n - 1) this.frame = n - 1;
   }
 
   sync() {
@@ -322,9 +335,11 @@ export class Actor {
       const away = ang + Math.PI + Math.sin(this.scene.now * 1.7 + this.home.x) * 0.5;
       const mvx = Math.cos(away), mvy = Math.sin(away);
       this.face(mvx, mvy);
+      const bx2 = this.x, by2 = this.y;
       const ok = this.moveBy(mvx * stats.runSpeed * dt, mvy * stats.runSpeed * dt);
       this.play(ok ? 'run' : 'idle');
-      this.advanceClip(dt, 1.1);
+      if (ok) this.advanceClipByDistance(Math.hypot(this.x - bx2, this.y - by2));
+      else this.advanceClip(dt);
       return;
     }
 
@@ -347,9 +362,11 @@ export class Actor {
       }
     }
 
+    const bx = this.x, by = this.y;
     const moved = this.moveBy(mx * sp * dt, my * sp * dt);
     this.play(moved ? (far ? (this.baked.clips.has('run') ? 'run' : 'walk') : 'walk') : 'idle');
-    this.advanceClip(dt, far ? 1 : 0.9);
+    if (moved) this.advanceClipByDistance(Math.hypot(this.x - bx, this.y - by));
+    else this.advanceClip(dt);
 
     if (this.think <= 0) {
       const a = chooseAttack(list, dist, this.cd, this.scene.now);
@@ -378,8 +395,11 @@ export class Actor {
       else {
         const sp = (this.def?.speed ?? 1.2) * 0.55;
         this.face(dx, dy);
+        const wx = this.x, wy = this.y;
         if (!this.moveBy((dx / d) * sp * dt, (dy / d) * sp * dt)) this.target = null;
         this.play('walk');
+        this.advanceClipByDistance(Math.hypot(this.x - wx, this.y - wy));
+        return;
       }
     } else this.play('idle');
     this.advanceClip(dt, 0.8);

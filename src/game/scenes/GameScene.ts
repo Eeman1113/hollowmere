@@ -522,6 +522,7 @@ export class GameScene extends Phaser.Scene {
     const speedBase = 3.1 * (tier === 0 ? 1.08 : tier === 1 ? 1 : tier === 2 ? 0.88 : 0.6);
     const speed = (this.sprinting ? speedBase * 1.72 : this.blocking ? speedBase * 0.52 : speedBase) * (0.8 + pen * 0.2);
     let moved = false;
+    const bx = p.x, by = p.y;
     if (this.moveX || this.moveY) {
       moved = p.moveBy(this.moveX * speed * dt, this.moveY * speed * dt);
       if (this.lockOn && !this.lockOn.dead) p.face(this.lockOn.x - p.x, this.lockOn.y - p.y);
@@ -532,7 +533,8 @@ export class GameScene extends Phaser.Scene {
     p.blocking = this.blocking;
     const clip = this.blocking ? (moved ? 'blockwalk' : 'block') : moved ? (this.sprinting ? 'run' : 'walk') : 'idle';
     p.play(clip);
-    p.advanceClip(dt, moved && this.sprinting ? 1.05 : 1);
+    if (moved) p.advanceClipByDistance(Math.hypot(p.x - bx, p.y - by), this.sprinting ? 2.3 : 1.7);
+    else p.advanceClip(dt);
     p.separate([...this.actors, ...this.npcs]);
     p.update(dt);
   }
