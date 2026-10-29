@@ -10,6 +10,9 @@ import gravewarden from './gravewarden';
 import choirman from './choirman';
 import redhand from './redhand';
 import ghoul from './ghoul';
+import wraith from './wraith';
+import beastman from './beastman';
+import inquisitor from './inquisitor';
 // --- generated sprite imports end ---
 
 export const SPRITES: CodedSprite[] = [
@@ -20,6 +23,9 @@ export const SPRITES: CodedSprite[] = [
   choirman,
   redhand,
   ghoul,
+  wraith,
+  beastman,
+  inquisitor,
   // --- generated sprite list end ---
 ];
 
