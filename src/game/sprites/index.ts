@@ -30,6 +30,8 @@ import player_hunter from './player_hunter';
 import player_crown from './player_crown';
 import wolf from './wolf';
 import deer from './deer';
+import boar from './boar';
+import fenhound from './fenhound';
 // --- generated sprite imports end ---
 
 export const SPRITES: CodedSprite[] = [
@@ -60,6 +62,8 @@ export const SPRITES: CodedSprite[] = [
   player_crown,
   wolf,
   deer,
+  boar,
+  fenhound,
   // --- generated sprite list end ---
 ];
 
